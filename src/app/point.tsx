@@ -40,7 +40,8 @@ export function Point({
       let typePath = "";
       let typeFillColor;
 
-      switch (route_type) {
+      // TODO: optimise this
+      switch (parseInt(String(route_type))) {
         case 2: // train
           color = "#ffffff";
           // TODO: the path is missing the headlights
