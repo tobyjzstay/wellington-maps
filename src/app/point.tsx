@@ -1,6 +1,7 @@
 import { Marker } from "@react-google-maps/api";
 import React from "react";
-import { Route, Vehicle } from "./page";
+import { Route } from "./api/routes/route";
+import { Vehicle } from "./api/vehiclepositions/route";
 
 const TYPE_MARKER_SCALE = 1;
 const TYPE_ICON_SCALE = 5;
@@ -40,8 +41,7 @@ export function Point({
       let typePath = "";
       let typeFillColor;
 
-      // TODO: optimise this
-      switch (parseInt(String(route_type))) {
+      switch (route_type) {
         case 2: // train
           color = "#ffffff";
           // TODO: the path is missing the headlights

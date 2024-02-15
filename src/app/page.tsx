@@ -9,6 +9,8 @@ import {
   useLoadScript,
 } from "@react-google-maps/api";
 import React from "react";
+import { Route } from "./api/routes/route";
+import { Entity, VehiclePositions } from "./api/vehiclepositions/route";
 import { Point } from "./point";
 
 const UPDATE_INTERVAL = 5000;
@@ -18,59 +20,6 @@ const WELLINGTON = {
 };
 
 const libraries: Libraries = ["places"];
-
-export type Route = {
-  id: number | string;
-  route_id: string;
-  agency_id: string;
-  route_short_name: string;
-  route_long_name: string;
-  route_desc: string;
-  route_type: number | string;
-  route_color: string;
-  route_text_color: string;
-  route_url: string;
-};
-
-export type VehiclePositions = {
-  entity: Entity[];
-  header: Header;
-};
-
-type Header = {
-  gtfsRealtimeVersion: string;
-  incrementality: number;
-  timestamp: number;
-};
-
-type Entity = {
-  id: string;
-  vehicle: Vehicle;
-};
-
-export type Vehicle = {
-  trip: Trip;
-  position: Position;
-  vehicle: {
-    id: string;
-  };
-  timestamp: number;
-};
-
-type Trip = {
-  start_time: string;
-  trip_id: string;
-  direction_id: number;
-  route_id: number;
-  schedule_relationship: number;
-  start_date: string;
-};
-
-type Position = {
-  bearing: number;
-  latitude: number;
-  longitude: number;
-};
 
 function App() {
   const [map, setMap] = React.useState<GoogleMap | null>(null);
