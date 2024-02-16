@@ -3,9 +3,7 @@
 import {
   BicyclingLayer,
   GoogleMap,
-  Libraries,
   TrafficLayer,
-  TransitLayer,
   useLoadScript,
 } from "@react-google-maps/api";
 import React from "react";
@@ -22,10 +20,8 @@ const WELLINGTON = {
   lng: 174.7542577,
 };
 
-const libraries: Libraries = ["places"];
-
 function App() {
-  const [map, setMap] = React.useState<GoogleMap | null>(null);
+  const [map, setMap] = React.useState<google.maps.Map | null>(null);
   const [routeMap, setRouteMap] = React.useState<Map<number, Route> | null>(
     null
   );
@@ -40,10 +36,9 @@ function App() {
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries,
   });
 
-  const [path, setPath] = React.useState<google.maps.Polyline | null>(null);
+  const path = React.useRef<google.maps.Polyline | null>(null);
 
   React.useEffect(() => {
     if (!isLoaded) return;
@@ -73,18 +68,15 @@ function App() {
               const { shape_id } = trip;
               let shapes = shapeMap!.get(shape_id);
               if (!shapes) return;
-              console.log(path);
-              path?.setMap(null);
-              setPath(
-                new google.maps.Polyline({
-                  strokeColor: "#" + route.route_color,
-                  path: shapes.map((shape) => ({
-                    lat: shape.shape_pt_lat,
-                    lng: shape.shape_pt_lon,
-                  })),
-                  map: map?.state.map,
-                })
-              );
+              path.current?.setMap(null);
+              path.current = new google.maps.Polyline({
+                path: shapes!.map((shape) => ({
+                  lat: shape.shape_pt_lat,
+                  lng: shape.shape_pt_lon,
+                })),
+                strokeColor: "#" + route.route_color,
+              });
+              path.current.setMap(map);
             }}
             route={route}
             vehicle={vehicle}
@@ -95,14 +87,13 @@ function App() {
       setMarkers(markers);
     }
 
-    if (!isLoaded || routeMap === null || shapeMap === null || tripMap === null)
-      return;
+    if (routeMap === null || shapeMap === null || tripMap === null) return;
     (async () => {
       update();
       const interval = setInterval(update, UPDATE_INTERVAL);
       return () => clearInterval(interval);
     })();
-  }, [isLoaded, map?.state.map, path, routeMap, shapeMap, tripMap]);
+  }, [isLoaded, map, path, routeMap, shapeMap, tripMap]);
 
   if (loadError) {
     return <div>Error loading maps</div>;
@@ -131,11 +122,13 @@ function App() {
           },
         ],
       }}
-      ref={(map) => setMap(map)}
+      ref={(ref) => {
+        setMap(ref?.state.map || null);
+      }}
       zoom={12}
     >
       <TrafficLayer />
-      <TransitLayer />
+      {/* <TransitLayer /> */}
       <BicyclingLayer />
       {markers}
     </GoogleMap>
