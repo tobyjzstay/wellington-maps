@@ -7,10 +7,12 @@ const TYPE_MARKER_SCALE = 1;
 const TYPE_ICON_SCALE = 5;
 
 export function Point({
+  onClick,
   route,
   vehicle,
   zIndex,
 }: {
+  onClick: () => void;
   route: Route;
   vehicle: Vehicle;
   zIndex: number;
@@ -20,7 +22,6 @@ export function Point({
   const [typeIconMarker, setTypeIconMarker] = React.useState<Marker | null>(
     null
   );
-  const [showInfo, setShowInfo] = React.useState(false);
 
   const {
     route_id,
@@ -142,9 +143,7 @@ export function Point({
     return (
       <Marker
         key={vehicle.vehicle.id}
-        onClick={() => {
-          setShowInfo(!showInfo);
-        }}
+        onClick={onClick}
         options={{
           icon: {
             fillOpacity: 1,
@@ -230,7 +229,6 @@ export function Point({
     longitude,
     typeFillColor,
     typePath,
-    showInfo,
   ]);
 
   if (latitude === 0 && longitude === 0) return null; // null island
