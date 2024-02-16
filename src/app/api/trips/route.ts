@@ -23,7 +23,7 @@ export async function GET(request: Request) {
 
   await cacheRequest(
     trips,
-    "https://api.opendata.metlink.org.nz/v1/gtfs/transfers",
+    "https://api.opendata.metlink.org.nz/v1/gtfs/trips",
     86400,
     (response): Promise<Trip[]> => {
       return response.json();
