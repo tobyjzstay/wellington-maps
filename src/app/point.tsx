@@ -32,6 +32,7 @@ export function Point({
     route_text_color,
   } = route;
   const { bearing, latitude, longitude } = vehicle.position;
+  const vehicle_id = vehicle.vehicle.id;
 
   const { color, fillColor, strokeColor, typePath, typeFillColor } =
     React.useMemo(() => {
@@ -142,7 +143,7 @@ export function Point({
   const point = React.useMemo(() => {
     return (
       <Marker
-        key={vehicle.vehicle.id}
+        key={vehicle_id}
         onClick={onClick}
         options={{
           icon: {
@@ -170,6 +171,7 @@ export function Point({
         ref={setMarker}
       >
         <Marker
+          // onClick={onClick}
           options={{
             icon: {
               path: "M 0 0 m -8 0 a 8 8 0 1 0 16 0 a 8 8 0 1 0 -16 0", // circle
@@ -180,6 +182,7 @@ export function Point({
               anchor: new google.maps.Point(-12, -12),
               scale: TYPE_MARKER_SCALE,
             },
+            // title: route_long_name,
             zIndex: zIndex + 1,
           }}
           position={{
@@ -189,6 +192,7 @@ export function Point({
           ref={setTypeMarker}
         >
           <Marker
+            onClick={onClick}
             options={{
               icon: {
                 path: typePath,
@@ -205,6 +209,7 @@ export function Point({
                 ),
                 scale: (1 / TYPE_ICON_SCALE) * TYPE_MARKER_SCALE,
               },
+              title: route_long_name,
               zIndex: zIndex + 2,
             }}
             position={{
@@ -217,7 +222,7 @@ export function Point({
       </Marker>
     );
   }, [
-    vehicle.vehicle.id,
+    onClick,
     fillColor,
     bearing,
     strokeColor,
@@ -228,6 +233,7 @@ export function Point({
     latitude,
     longitude,
     typeFillColor,
+    vehicle_id,
     typePath,
   ]);
 
