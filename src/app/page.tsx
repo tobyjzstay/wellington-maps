@@ -42,10 +42,9 @@ function App() {
 
   React.useEffect(() => {
     if (!isLoaded) return;
-    const stopLocations: number[] = [];
     getRouteMap().then(setRouteMap);
-    getStopMap(stopLocations).then(setStopMap);
-    getShapeMap(stopLocations).then(setShapeMap);
+    getStopMap().then(setStopMap);
+    getShapeMap().then(setShapeMap);
     getTripMap().then(setTripMap);
   }, [isLoaded]);
 
@@ -145,41 +144,23 @@ async function getRouteMap() {
   return routeMap;
 }
 
-async function getStopMap(stopLocations: number[]) {
+async function getStopMap() {
   const response = await fetch("/api/stops");
   const stops: Stop[] = await response.json();
   const stopMap = new Map<number, Stop>();
   for (const stop of stops) {
     stopMap.set(parseInt(stop.stop_id), stop);
-    stopLocations.push(stop.stop_lat, stop.stop_lon);
   }
   return stopMap;
 }
 
-async function getShapeMap(stopLocations: number[]) {
+async function getShapeMap() {
   const response = await fetch("/api/shapes");
   const shapes: Shape[] = await response.json();
   const shapeMap = new Map<string, Shape[]>();
   for (let i = 0; i < shapes.length; i++) {
-    if (i === 0 || i === shapes.length - 1) continue;
     const shape = shapes[i];
-    const penultimateShape = shapes[i - 2];
-    const { shape_id, shape_pt_lat, shape_pt_lon } = shape;
-    if (
-      penultimateShape &&
-      penultimateShape.shape_pt_lat === shape_pt_lat &&
-      penultimateShape.shape_pt_lon === shape_pt_lon
-    ) {
-      shapeMap.get(shape_id)!.pop();
-      continue;
-    }
-    for (let j = 0; j < stopLocations.length; j += 2) {
-      if (
-        stopLocations[j] === shape_pt_lat &&
-        stopLocations[j + 1] === shape_pt_lon
-      )
-        continue;
-    }
+    const { shape_id } = shape;
     if (!shapeMap.has(shape_id)) shapeMap.set(shape_id, []);
     shapeMap.get(shape_id)!.push(shape);
   }
