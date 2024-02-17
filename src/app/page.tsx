@@ -39,7 +39,7 @@ function App() {
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
   });
 
-  const path = React.useRef<google.maps.Polyline | null>(null);
+  const polylines = React.useRef<google.maps.Polyline[]>([]);
 
   React.useEffect(() => {
     if (!isLoaded) return;
@@ -62,7 +62,8 @@ function App() {
           <Point
             key={vehicle.vehicle.id}
             onClick={() => {
-              path.current?.setMap(null);
+              polylines.current?.forEach((polyline) => polyline.setMap(null));
+              // shape data for trains is not as accurate as Google's
               if (route.route_type === 2) return;
               const trip_id = vehicle.trip.trip_id;
               const trip = tripMap!.get(trip_id);
@@ -70,18 +71,28 @@ function App() {
               const { shape_id } = trip;
               let shapes = shapeMap!.get(shape_id);
               if (!shapes) return;
-              path.current = new google.maps.Polyline({
-                path: shapes!.map((shape) => ({
-                  lat: shape.shape_pt_lat,
-                  lng: shape.shape_pt_lon,
-                })),
-                strokeColor: "#" + route.route_color,
+              const path = shapes!.map((shape) => ({
+                lat: shape.shape_pt_lat,
+                lng: shape.shape_pt_lon,
+              }));
+              // fill
+              polylines.current[1] = new google.maps.Polyline({
+                path,
+                strokeColor: "#ffffff",
+                strokeWeight: 4,
               });
-              path.current.setMap(map);
+              // outline
+              polylines.current[0] = new google.maps.Polyline({
+                path,
+                strokeColor: "#" + route.route_color,
+                strokeWeight: 2,
+                zIndex: 1,
+              });
+              polylines.current?.forEach((polyline) => polyline.setMap(map));
             }}
             route={route}
             vehicle={vehicle}
-            zIndex={index * 10}
+            zIndex={index + 1 * 10}
           />
         );
       });
@@ -94,7 +105,7 @@ function App() {
       const interval = setInterval(update, UPDATE_INTERVAL);
       return () => clearInterval(interval);
     })();
-  }, [isLoaded, map, path, routeMap, shapeMap, tripMap]);
+  }, [isLoaded, map, polylines, routeMap, shapeMap, tripMap]);
 
   if (loadError) {
     return <div>Error loading maps</div>;
@@ -113,7 +124,7 @@ function App() {
       }}
       mapTypeId={google.maps.MapTypeId.ROADMAP}
       onClick={() => {
-        path.current?.setMap(null);
+        polylines.current?.forEach((polyline) => polyline.setMap(null));
       }}
       options={{
         mapTypeControl: false,
