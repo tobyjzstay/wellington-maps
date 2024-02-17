@@ -4,6 +4,7 @@ import {
   BicyclingLayer,
   GoogleMap,
   TrafficLayer,
+  TransitLayer,
   useLoadScript,
 } from "@react-google-maps/api";
 import React from "react";
@@ -61,13 +62,14 @@ function App() {
           <Point
             key={vehicle.vehicle.id}
             onClick={() => {
+              path.current?.setMap(null);
+              if (route.route_type === 2) return;
               const trip_id = vehicle.trip.trip_id;
               const trip = tripMap!.get(trip_id);
               if (!trip) return;
               const { shape_id } = trip;
               let shapes = shapeMap!.get(shape_id);
               if (!shapes) return;
-              path.current?.setMap(null);
               path.current = new google.maps.Polyline({
                 path: shapes!.map((shape) => ({
                   lat: shape.shape_pt_lat,
@@ -110,6 +112,9 @@ function App() {
         height: "100vh",
       }}
       mapTypeId={google.maps.MapTypeId.ROADMAP}
+      onClick={() => {
+        path.current?.setMap(null);
+      }}
       options={{
         mapTypeControl: false,
         streetViewControl: false,
@@ -127,7 +132,7 @@ function App() {
       zoom={12}
     >
       <TrafficLayer />
-      {/* <TransitLayer /> */}
+      <TransitLayer />
       <BicyclingLayer />
       {markers}
     </GoogleMap>
