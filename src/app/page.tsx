@@ -58,11 +58,7 @@ function App() {
       const { id, route_id, shape_id } = trip;
       const route = routeMap.get(route_id);
       if (!route || drawnShapes.indexOf(shape_id) >= 0) return;
-      if (
-        route.route_type === RouteType.RAIL || // shape data for trains is not as accurate as Google's
-        route.route_type === RouteType.SCHOOL_BUS
-      )
-        return;
+      if (route.route_type === RouteType.SCHOOL_BUS) return;
       const shapes = shapeMap.get(shape_id);
       if (!shapes) return;
       const { strokeColor } = getRouteColor(route);
@@ -119,15 +115,13 @@ function App() {
         const { vehicle } = entity;
         const route = routeMap.get(vehicle.trip.route_id);
         if (!route) return null;
-        const { id, route_type } = route;
+        const { id } = route;
         const { strokeColor } = getRouteColor(route);
         return (
           <Point
             key={vehicle.vehicle.id}
             onClick={() => {
               polylines.current?.forEach((polyline) => polyline.setMap(null));
-              // shape data for trains is not as accurate as Google's
-              if (route_type === RouteType.RAIL) return;
               const trip_id = vehicle.trip.trip_id;
               const trip = tripMap.get(trip_id);
               if (!trip) return;
@@ -198,6 +192,11 @@ function App() {
           {
             featureType: "poi",
             elementType: "labels",
+            stylers: [{ visibility: "off" }],
+          },
+          {
+            featureType: "transit.line",
+            elementType: "all",
             stylers: [{ visibility: "off" }],
           },
         ],
