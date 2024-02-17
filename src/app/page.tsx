@@ -14,12 +14,14 @@ import { Stop } from "./api/stops/route";
 import { Trip } from "./api/trips/route";
 import { Entity, VehiclePositions } from "./api/vehiclepositions/route";
 import { Point } from "./point";
+import { RouteType, getRouteColor } from "./util";
 
 const UPDATE_INTERVAL = 5000;
 const WELLINGTON = {
   lat: -41.2529601,
   lng: 174.7542577,
 };
+let Z_INDEX_BUFFER = 0;
 
 function App() {
   const [map, setMap] = React.useState<google.maps.Map | null>(null);
@@ -50,62 +52,125 @@ function App() {
   }, [isLoaded]);
 
   React.useEffect(() => {
+    if (routeMap === null || shapeMap === null || tripMap === null) return;
+    const drawnShapes: string[] = [];
+    Array.from(tripMap.values()).forEach((trip) => {
+      const { id, route_id, shape_id } = trip;
+      const route = routeMap.get(route_id);
+      if (!route || drawnShapes.indexOf(shape_id) >= 0) return;
+      if (
+        route.route_type === RouteType.RAIL || // shape data for trains is not as accurate as Google's
+        route.route_type === RouteType.SCHOOL_BUS
+      )
+        return;
+      const shapes = shapeMap.get(shape_id);
+      if (!shapes) return;
+      const { strokeColor } = getRouteColor(route);
+      const path = shapes.map((shape) => ({
+        lat: shape.shape_pt_lat,
+        lng: shape.shape_pt_lon,
+      }));
+      const onClick = () => {
+        polylines.current?.forEach((polyline) => polyline.setMap(null));
+        // outline
+        polylines.current[1] = new google.maps.Polyline({
+          path,
+          strokeColor: "#ffffff",
+          strokeWeight: 9,
+          zIndex: Z_INDEX_BUFFER * 2 - id,
+        });
+        // fill
+        polylines.current[0] = new google.maps.Polyline({
+          path,
+          strokeColor,
+          strokeWeight: 6,
+          zIndex: Z_INDEX_BUFFER * 2 - id + 1,
+        });
+        polylines.current?.forEach((polyline) => polyline.setMap(map));
+      };
+      const outline = new google.maps.Polyline({
+        map,
+        clickable: true,
+        path,
+        strokeColor: "#ffffff",
+        strokeWeight: 3,
+        zIndex: Z_INDEX_BUFFER - id,
+      });
+      outline.addListener("click", onClick);
+      const fill = new google.maps.Polyline({
+        map,
+        path,
+        strokeColor,
+        strokeWeight: 2,
+        zIndex: Z_INDEX_BUFFER - id + 1,
+      });
+      fill.addListener("click", onClick);
+      drawnShapes.push(shape_id);
+    });
+  }, [map, routeMap, shapeMap, tripMap]);
+
+  React.useEffect(() => {
     async function update() {
+      if (routeMap === null || shapeMap === null || tripMap === null) return;
       const response = await fetch("/api/vehiclepositions");
       const vehiclepositions: VehiclePositions = await response.json();
       const { entity } = vehiclepositions;
       const markers = entity.map((entity: Entity, index: number) => {
         const { vehicle } = entity;
-        const route = routeMap!.get(vehicle.trip.route_id);
+        const route = routeMap.get(vehicle.trip.route_id);
         if (!route) return null;
+        const { id, route_type } = route;
+        const { strokeColor } = getRouteColor(route);
         return (
           <Point
             key={vehicle.vehicle.id}
             onClick={() => {
               polylines.current?.forEach((polyline) => polyline.setMap(null));
               // shape data for trains is not as accurate as Google's
-              if (route.route_type === 2) return;
+              if (route_type === RouteType.RAIL) return;
               const trip_id = vehicle.trip.trip_id;
-              const trip = tripMap!.get(trip_id);
+              const trip = tripMap.get(trip_id);
               if (!trip) return;
               const { shape_id } = trip;
-              let shapes = shapeMap!.get(shape_id);
+              let shapes = shapeMap.get(shape_id);
               if (!shapes) return;
-              const path = shapes!.map((shape) => ({
+              const path = shapes.map((shape) => ({
                 lat: shape.shape_pt_lat,
                 lng: shape.shape_pt_lon,
               }));
-              // fill
+              // outline
               polylines.current[1] = new google.maps.Polyline({
                 path,
                 strokeColor: "#ffffff",
-                strokeWeight: 4,
+                strokeWeight: 9,
+                zIndex: Z_INDEX_BUFFER * 2 - id,
               });
-              // outline
+              // fill
               polylines.current[0] = new google.maps.Polyline({
                 path,
-                strokeColor: "#" + route.route_color,
-                strokeWeight: 2,
-                zIndex: 1,
+                strokeColor,
+                strokeWeight: 6,
+                zIndex: Z_INDEX_BUFFER * 2 - id + 1,
               });
               polylines.current?.forEach((polyline) => polyline.setMap(map));
             }}
             route={route}
             vehicle={vehicle}
-            zIndex={index + 1 * 10}
+            zIndex={index * Z_INDEX_BUFFER * 2 + 1}
           />
         );
       });
       setMarkers(markers);
     }
 
-    if (routeMap === null || shapeMap === null || tripMap === null) return;
     (async () => {
       update();
       const interval = setInterval(update, UPDATE_INTERVAL);
       return () => clearInterval(interval);
     })();
   }, [isLoaded, map, polylines, routeMap, shapeMap, tripMap]);
+
+  function highlightRoute(route: Route) {}
 
   if (loadError) {
     return <div>Error loading maps</div>;
@@ -155,7 +220,9 @@ async function getRouteMap() {
   const routes: Route[] = await response.json();
   const routeMap = new Map<number, Route>();
   for (const route of routes) {
-    routeMap.set(parseInt(route.route_id), route);
+    const route_id = parseInt(route.route_id);
+    routeMap.set(route_id, route);
+    if (Z_INDEX_BUFFER < route_id) Z_INDEX_BUFFER = route_id;
   }
   return routeMap;
 }
