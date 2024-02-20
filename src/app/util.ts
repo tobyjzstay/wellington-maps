@@ -8,6 +8,13 @@ export enum RouteType {
   SCHOOL_BUS = 712,
 }
 
+export enum BusRouteType {
+  FREQUENT,
+  STANDARD,
+  PEAK_EXPRESS_EXTENDED,
+  MIDNIGHT,
+}
+
 export function getRouteTypeColor(route_type: RouteType | string) {
   switch (route_type) {
     case RouteType.RAIL:
@@ -244,7 +251,7 @@ export enum RouteId {
   ROUTE_N88 = "9988",
 }
 
-export function isFrequentBus(route_id: RouteId | string) {
+export function getBusRouteType(route_id: RouteId | string) {
   switch (route_id) {
     case RouteId.ROUTE_AX:
     case RouteId.ROUTE_1:
@@ -258,14 +265,75 @@ export function isFrequentBus(route_id: RouteId | string) {
     case RouteId.ROUTE_120:
     case RouteId.ROUTE_130:
     case RouteId.ROUTE_220:
-      return true;
-    default:
-      return false;
-  }
-}
-
-export function isMidnightBus(route_id: RouteId | string) {
-  switch (route_id) {
+      return BusRouteType.FREQUENT;
+    case RouteId.ROUTE_14:
+    case RouteId.ROUTE_17:
+    case RouteId.ROUTE_18:
+    case RouteId.ROUTE_19:
+    case RouteId.ROUTE_20:
+    case RouteId.ROUTE_23:
+    case RouteId.ROUTE_24:
+    case RouteId.ROUTE_25:
+    case RouteId.ROUTE_27:
+    case RouteId.ROUTE_29:
+    case RouteId.ROUTE_52:
+    case RouteId.ROUTE_60:
+    case RouteId.ROUTE_83:
+    case RouteId.ROUTE_111:
+    case RouteId.ROUTE_112:
+    case RouteId.ROUTE_114:
+    case RouteId.ROUTE_115:
+    case RouteId.ROUTE_121:
+    case RouteId.ROUTE_145:
+    case RouteId.ROUTE_149:
+    case RouteId.ROUTE_150:
+    case RouteId.ROUTE_154:
+    case RouteId.ROUTE_160:
+    case RouteId.ROUTE_170:
+    case RouteId.ROUTE_200:
+    case RouteId.ROUTE_210:
+    case RouteId.ROUTE_226:
+    case RouteId.ROUTE_230:
+    case RouteId.ROUTE_236:
+    case RouteId.ROUTE_250:
+    case RouteId.ROUTE_260:
+    case RouteId.ROUTE_261:
+    case RouteId.ROUTE_262:
+    case RouteId.ROUTE_280:
+    case RouteId.ROUTE_281:
+    case RouteId.ROUTE_290:
+      return BusRouteType.STANDARD;
+    case RouteId.ROUTE_12e:
+    case RouteId.ROUTE_13:
+    case RouteId.ROUTE_26:
+    case RouteId.ROUTE_28:
+    case RouteId.ROUTE_30x:
+    case RouteId.ROUTE_31x:
+    case RouteId.ROUTE_32x:
+    case RouteId.ROUTE_33:
+    case RouteId.ROUTE_34:
+    case RouteId.ROUTE_35:
+    case RouteId.ROUTE_36:
+    case RouteId.ROUTE_37:
+    case RouteId.ROUTE_39:
+    case RouteId.ROUTE_56:
+    case RouteId.ROUTE_57:
+    case RouteId.ROUTE_58:
+    case RouteId.ROUTE_60e:
+    case RouteId.ROUTE_81:
+    case RouteId.ROUTE_84:
+    case RouteId.ROUTE_113:
+    case RouteId.ROUTE_201:
+    case RouteId.ROUTE_202:
+    case RouteId.ROUTE_203:
+    case RouteId.ROUTE_204:
+    case RouteId.ROUTE_206:
+    case RouteId.ROUTE_251:
+    case RouteId.ROUTE_264:
+    case RouteId.ROUTE_291:
+    case RouteId.ROUTE_300:
+    case RouteId.ROUTE_HX:
+      return BusRouteType.PEAK_EXPRESS_EXTENDED;
     case RouteId.ROUTE_N1:
     case RouteId.ROUTE_N2:
     case RouteId.ROUTE_N3:
@@ -276,9 +344,9 @@ export function isMidnightBus(route_id: RouteId | string) {
     case RouteId.ROUTE_N22:
     case RouteId.ROUTE_N66:
     case RouteId.ROUTE_N88:
-      return true;
+      return BusRouteType.MIDNIGHT;
     default:
-      return false;
+      return null;
   }
 }
 
@@ -296,14 +364,19 @@ export function getRouteColor(route: Route) {
       typeFillColor = "#784e90";
       break;
     case RouteType.BUS:
-      if (isFrequentBus(route_id)) color = "#ffffff";
-      else if (isMidnightBus(route_id)) {
-        color = "#fff200";
-        fillColor = "#3d3d3d";
-        strokeColor = "#3d3d3d";
-      } else {
-        color = "#" + route_color;
-        fillColor = "#ffffff";
+      switch (getBusRouteType(route_id)) {
+        case BusRouteType.FREQUENT:
+          color = "#ffffff";
+          break;
+        case BusRouteType.MIDNIGHT:
+          color = "#fff200";
+          fillColor = "#3d3d3d";
+          strokeColor = "#3d3d3d";
+          break;
+        default:
+          color = "#" + route_color;
+          fillColor = "#ffffff";
+          break;
       }
       typeFillColor = "#4e801f";
       break;

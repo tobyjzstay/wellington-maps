@@ -13,7 +13,7 @@ export type Shape = {
 
 export async function GET(request: Request) {
   const full = await fetchMetlinkFull();
-  if (full == null) return new Response(null, { status: 503 });
+  if (!full) return new Response(null, { status: 503 });
   const { shapes } = full;
 
   const headers = new Headers(request.headers);

@@ -1,5 +1,6 @@
 "use client";
 
+import CircularProgress from "@mui/material/CircularProgress";
 import { useLoadScript } from "@react-google-maps/api";
 import Maps from "./maps";
 
@@ -13,7 +14,19 @@ function App() {
   }
 
   if (!isLoaded) {
-    return <div>Loading maps</div>;
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          width: "100vw",
+          height: "100vh",
+        }}
+      >
+        <CircularProgress />
+      </div>
+    );
   }
 
   return <Maps />;

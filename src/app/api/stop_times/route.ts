@@ -19,8 +19,7 @@ type StopTime = {
 };
 
 export async function GET(request: Request) {
-  if (process.env.METLINK_API_KEY == null)
-    return new Response(null, { status: 503 });
+  if (!process.env.METLINK_API_KEY) return new Response(null, { status: 503 });
 
   await cacheRequest(
     stop_time,

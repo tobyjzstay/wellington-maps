@@ -15,8 +15,7 @@ export async function fetchMetlink(
   path: string,
   next?: NextFetchRequestConfig
 ) {
-  if (process.env.METLINK_API_KEY == null)
-    return new Response(null, { status: 503 });
+  if (!process.env.METLINK_API_KEY) return new Response(null, { status: 503 });
 
   return await fetch("https://api.opendata.metlink.org.nz/v1" + path, {
     headers: {
@@ -50,7 +49,7 @@ type Full = {
 };
 
 export async function fetchMetlinkFull() {
-  if (process.env.METLINK_API_KEY == null) return null;
+  if (!process.env.METLINK_API_KEY) return null;
 
   await cacheRequest(
     full,
@@ -67,7 +66,7 @@ export async function fetchMetlinkFull() {
         let name = file.name.slice(0, ".txt".length * -1) as keyof Full;
         const data: (typeof full.data)[typeof name] = [];
         for (const line of text.split("\n")) {
-          if (headers == null) {
+          if (headers === null) {
             headers = line.split(",");
             continue;
           }
