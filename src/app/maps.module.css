@@ -1,11 +1,13 @@
 .maps-container {
+  display: flex;
   width: 100vw;
   height: 100vh;
 }
 
-.maps-drawer-paper {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
+.maps-map {
+  flex-grow: 1;
+}
+
+.maps-drawer {
   padding: 8px;
 }

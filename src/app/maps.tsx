@@ -4,9 +4,12 @@
 import {
   Box,
   Checkbox,
+  Divider,
+  Drawer,
   FormControlLabel,
   FormGroup,
-  Paper,
+  Toolbar,
+  Typography,
 } from "@mui/material";
 import React from "react";
 import { Route } from "./api/routes/route";
@@ -314,11 +317,26 @@ function Maps() {
   }, [map, polylines, routeMap, shapeMap, tripMap]);
 
   return (
-    <>
-      <div id="map" className={styles["maps-container"]} />
-      {markers}
-      <Paper className={styles["maps-drawer-paper"]}>
-        <FormGroup>
+    <div className={styles["maps-container"]}>
+      <Drawer
+        sx={{
+          width: 300,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
+            width: 300,
+            boxSizing: "border-box",
+          },
+        }}
+        variant="permanent"
+        anchor="left"
+      >
+        <Toolbar>
+          <Typography variant="h6" noWrap>
+            Wellington Maps
+          </Typography>
+        </Toolbar>
+        <Divider />
+        <FormGroup className={styles["maps-drawer"]}>
           <FormControlLabel
             control={
               <Checkbox
@@ -425,8 +443,10 @@ function Maps() {
             label="School Bus"
           />
         </FormGroup>
-      </Paper>
-    </>
+      </Drawer>
+      <div id="map" className={styles["maps-map"]} />
+      {markers}
+    </div>
   );
 }
 
