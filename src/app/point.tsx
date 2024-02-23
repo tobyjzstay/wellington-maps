@@ -1,30 +1,24 @@
-import { Marker } from "@react-google-maps/api";
 import React from "react";
 import { Route } from "./api/routes/route";
 import { Vehicle } from "./api/vehiclepositions/route";
+import { ZIndexLayer, zIndexGen } from "./maps";
 import { RouteType, getRouteColor } from "./util";
 
 const TYPE_MARKER_SCALE = 1;
 const TYPE_ICON_SCALE = 5;
 
 export function Point({
+  map,
   onClick,
   route,
   vehicle,
-  zIndex,
 }: {
+  map: google.maps.Map | null;
   onClick: () => void;
   route: Route;
   vehicle: Vehicle;
-  zIndex: number;
 }) {
-  const [marker, setMarker] = React.useState<Marker | null>(null);
-  const [typeMarker, setTypeMarker] = React.useState<Marker | null>(null);
-  const [typeIconMarker, setTypeIconMarker] = React.useState<Marker | null>(
-    null
-  );
-
-  const { route_short_name, route_long_name, route_type } = route;
+  const { id, route_short_name, route_long_name, route_type } = route;
   const { bearing, latitude, longitude } = vehicle.position;
   const vehicle_id = vehicle.vehicle.id;
 
@@ -67,125 +61,91 @@ export function Point({
       };
     }, [route, route_type]);
 
+  const zIndex = React.useMemo(
+    () => zIndexGen(id, ZIndexLayer.MARKER) * 3,
+    [id]
+  );
+
+  const marker = React.useMemo(
+    () =>
+      new google.maps.Marker({
+        icon: {
+          fillOpacity: 1,
+          fillColor,
+          path: "M 0 0 m -16 0 a 16 16 0 1 0 32 0 a 16 16 0 1 0 -32 0", // circle
+          strokeColor,
+          strokeWeight: 1,
+        },
+        label: {
+          color,
+          fontFamily: "roboto, sans-serif",
+          fontSize: 13 + "px",
+          fontWeight: "700",
+          text: route_short_name,
+        },
+        title: route_long_name,
+        zIndex: zIndex, // prevent flickering
+      }),
+    [color, fillColor, route_long_name, route_short_name, strokeColor, zIndex]
+  );
+  marker.addListener("click", onClick);
+
+  const typeMarker = React.useMemo(
+    () =>
+      new google.maps.Marker({
+        icon: {
+          anchor: new google.maps.Point(-12, -12),
+          fillColor: typeFillColor,
+          fillOpacity: 1,
+          path: "M 0 0 m -8 0 a 8 8 0 1 0 16 0 a 8 8 0 1 0 -16 0", // circle
+          scale: TYPE_MARKER_SCALE,
+          strokeColor: "#ffffff",
+          strokeWeight: 1,
+        },
+        zIndex: zIndex + 1,
+      }),
+    [typeFillColor, zIndex]
+  );
+
+  const typeIconMarker = React.useMemo(() => {
+    const marker = new google.maps.Marker({
+      icon: {
+        anchor: new google.maps.Point(
+          27.762 -
+            ((12 * TYPE_MARKER_SCALE) / TYPE_MARKER_SCALE) * TYPE_ICON_SCALE,
+          36.14 -
+            ((12 * TYPE_MARKER_SCALE) / TYPE_MARKER_SCALE) * TYPE_ICON_SCALE
+        ),
+        fillColor: "#ffffff",
+        fillOpacity: 1,
+
+        path: typePath,
+        scale: (1 / TYPE_ICON_SCALE) * TYPE_MARKER_SCALE,
+        strokeWeight: 0,
+      },
+      title: route_long_name,
+      zIndex: zIndex + 2,
+    });
+    return marker;
+  }, [route_long_name, typePath, zIndex]);
+  typeIconMarker.addListener("click", onClick);
+
   React.useEffect(() => {
-    if (!marker || !typeMarker || !typeIconMarker) return;
-    marker.marker?.setPosition({
-      lat: vehicle.position.latitude,
-      lng: vehicle.position.longitude,
-    });
-    typeMarker.marker?.setPosition({
-      lat: vehicle.position.latitude,
-      lng: vehicle.position.longitude,
-    });
-    typeIconMarker.marker?.setPosition({
-      lat: vehicle.position.latitude,
-      lng: vehicle.position.longitude,
-    });
-  }, [
-    marker,
-    typeMarker,
-    typeIconMarker,
-    vehicle.position.latitude,
-    vehicle.position.longitude,
-  ]);
+    marker.setPosition({ lat: latitude, lng: longitude });
+    typeMarker.setPosition({ lat: latitude, lng: longitude });
+    typeIconMarker.setPosition({ lat: latitude, lng: longitude });
+  }, [latitude, longitude, marker, typeIconMarker, typeMarker]);
 
-  const point = React.useMemo(() => {
-    return (
-      <Marker
-        key={vehicle_id}
-        onClick={onClick}
-        options={{
-          icon: {
-            fillOpacity: 1,
-            fillColor,
-            path: "M 0 0 m -16 0 a 16 16 0 1 0 32 0 a 16 16 0 1 0 -32 0", // circle
-            rotation: bearing,
-            strokeColor,
-            strokeWeight: 1,
-          },
-          label: {
-            color,
-            fontFamily: "roboto, sans-serif",
-            fontSize: 13 + "px",
-            fontWeight: "700",
-            text: route_short_name,
-          },
-          title: route_long_name,
-          zIndex, // prevent flickering
-        }}
-        position={{
-          lat: latitude,
-          lng: longitude,
-        }}
-        ref={setMarker}
-      >
-        <Marker
-          // onClick={onClick}
-          options={{
-            icon: {
-              path: "M 0 0 m -8 0 a 8 8 0 1 0 16 0 a 8 8 0 1 0 -16 0", // circle
-              fillColor: typeFillColor,
-              fillOpacity: 1,
-              strokeColor: "#ffffff",
-              strokeWeight: 1,
-              anchor: new google.maps.Point(-12, -12),
-              scale: TYPE_MARKER_SCALE,
-            },
-            // title: route_long_name,
-            zIndex: zIndex + 1,
-          }}
-          position={{
-            lat: latitude,
-            lng: longitude,
-          }}
-          ref={setTypeMarker}
-        >
-          <Marker
-            onClick={onClick}
-            options={{
-              icon: {
-                path: typePath,
-                fillColor: "#ffffff",
-                fillOpacity: 1,
-                strokeWeight: 0,
-                anchor: new window.google.maps.Point(
-                  27.762 -
-                    ((12 * TYPE_MARKER_SCALE) / TYPE_MARKER_SCALE) *
-                      TYPE_ICON_SCALE,
-                  36.14 -
-                    ((12 * TYPE_MARKER_SCALE) / TYPE_MARKER_SCALE) *
-                      TYPE_ICON_SCALE
-                ),
-                scale: (1 / TYPE_ICON_SCALE) * TYPE_MARKER_SCALE,
-              },
-              title: route_long_name,
-              zIndex: zIndex + 2,
-            }}
-            position={{
-              lat: latitude,
-              lng: longitude,
-            }}
-            ref={setTypeIconMarker}
-          />
-        </Marker>
-      </Marker>
-    );
-  }, [
-    onClick,
-    fillColor,
-    bearing,
-    strokeColor,
-    color,
-    route_short_name,
-    route_long_name,
-    zIndex,
-    latitude,
-    longitude,
-    typeFillColor,
-    vehicle_id,
-    typePath,
-  ]);
+  React.useEffect(() => {
+    marker.setMap(map);
+    typeMarker.setMap(map);
+    typeIconMarker.setMap(map);
+    return () => {
+      marker.setMap(null);
+      typeMarker.setMap(null);
+      typeIconMarker.setMap(null);
+    };
+  }, [map, marker, typeIconMarker, typeMarker]);
 
-  if (latitude === 0 && longitude === 0) return null; // null island
-  return point;
+  return null;
 }

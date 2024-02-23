@@ -1,19 +1,12 @@
 "use client";
 
+import { Status, Wrapper } from "@googlemaps/react-wrapper";
 import CircularProgress from "@mui/material/CircularProgress";
-import { useLoadScript } from "@react-google-maps/api";
 import Maps from "./maps";
 
 function App() {
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-  });
-
-  if (loadError) {
-    return <div>Error loading maps</div>;
-  }
-
-  if (!isLoaded) {
+  const render = (status: Status): React.ReactElement => {
+    if (status === Status.FAILURE) return <div>Error loading maps</div>;
     return (
       <div
         style={{
@@ -27,9 +20,16 @@ function App() {
         <CircularProgress />
       </div>
     );
-  }
+  };
 
-  return <Maps />;
+  return (
+    <Wrapper
+      apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
+      render={render}
+    >
+      <Maps />
+    </Wrapper>
+  );
 }
 
 export default App;

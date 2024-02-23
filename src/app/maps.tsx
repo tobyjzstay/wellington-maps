@@ -8,12 +8,6 @@ import {
   FormGroup,
   Paper,
 } from "@mui/material";
-import {
-  BicyclingLayer,
-  GoogleMap,
-  TrafficLayer,
-  TransitLayer,
-} from "@react-google-maps/api";
 import React from "react";
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
@@ -33,7 +27,15 @@ const WELLINGTON = {
   lat: -41.2529601,
   lng: 174.7542577,
 };
-let Z_INDEX_BUFFER = 0;
+
+let zIndexBuffer = 0;
+export enum ZIndexLayer {
+  POLYLINE,
+  POLYLINE_SELECTED,
+  MARKER,
+}
+
+export const MapContext = React.createContext<google.maps.Map | null>(null);
 
 function Maps() {
   const [routeMap, setRouteMap] = React.useState<Map<number, Route> | null>(
@@ -44,10 +46,8 @@ function Maps() {
   );
   const [tripMap, setTripMap] = React.useState<Map<string, Trip> | null>(null);
 
-  const [map, setMap] = React.useState<google.maps.Map | null>(null);
-  const [markers, setMarkers] = React.useState<(React.JSX.Element | null)[]>(
-    []
-  );
+  const [markers, setMarkers] = React.useState<JSX.Element[]>([]);
+
   const polylines = React.useRef<google.maps.Polyline[]>([]);
   const railPolylines = React.useRef<google.maps.Polyline[]>([]);
   const frequentPolylines = React.useRef<google.maps.Polyline[]>([]);
@@ -76,8 +76,42 @@ function Maps() {
     getTripMap().then(setTripMap);
   }, []);
 
+  const mapElement = document.getElementById("map");
+
+  const map = React.useMemo(() => {
+    if (mapElement === null) return null;
+    return new google.maps.Map(document.getElementById("map")!, {
+      center: WELLINGTON,
+      mapTypeId: google.maps.MapTypeId.ROADMAP,
+      disableDefaultUI: true,
+      keyboardShortcuts: false,
+      styles: [
+        {
+          featureType: "poi",
+          elementType: "labels",
+          stylers: [{ visibility: "off" }],
+        },
+        {
+          featureType: "transit.line",
+          elementType: "all",
+          stylers: [{ visibility: "off" }],
+        },
+      ],
+      zoom: 12,
+    });
+  }, [mapElement]);
+  map?.addListener("click", () =>
+    polylines.current?.forEach((polyline) => polyline.setMap(null))
+  );
+
   React.useEffect(() => {
-    if (routeMap === null || shapeMap === null || tripMap === null) return;
+    if (
+      map === null ||
+      routeMap === null ||
+      shapeMap === null ||
+      tripMap === null
+    )
+      return;
     const drawnShapes: string[] = [];
     Array.from(tripMap.values()).forEach((trip) => {
       const { id, route_id: trip_route_id, shape_id } = trip;
@@ -92,29 +126,31 @@ function Maps() {
         lng: shape.shape_pt_lon,
       }));
       const onClick = () => {
+        const zIndex = zIndexGen(id, ZIndexLayer.POLYLINE_SELECTED);
         polylines.current?.forEach((polyline) => polyline.setMap(null));
         // outline
         polylines.current[1] = new google.maps.Polyline({
           path,
           strokeColor: "#ffffff",
           strokeWeight: 9,
-          zIndex: Z_INDEX_BUFFER * 2 - id,
+          zIndex: zIndex - 1,
         });
         // fill
         polylines.current[0] = new google.maps.Polyline({
           path,
           strokeColor,
           strokeWeight: 6,
-          zIndex: Z_INDEX_BUFFER * 2 - id + 1,
+          zIndex: zIndex,
         });
         polylines.current?.forEach((polyline) => polyline.setMap(map));
       };
+      const zIndex = zIndexGen(trip_route_id, ZIndexLayer.POLYLINE);
       const outline = new google.maps.Polyline({
         map,
         path,
         strokeColor: "#ffffff",
         strokeWeight: 3,
-        zIndex: Z_INDEX_BUFFER - id,
+        zIndex: zIndex - 1,
       });
       outline.addListener("click", onClick);
       const fill = new google.maps.Polyline({
@@ -122,7 +158,7 @@ function Maps() {
         path,
         strokeColor,
         strokeWeight: 2,
-        zIndex: Z_INDEX_BUFFER - id + 1,
+        zIndex: zIndex,
       });
       fill.addListener("click", onClick);
       switch (route_type) {
@@ -222,15 +258,17 @@ function Maps() {
       const response = await fetch("/api/vehiclepositions");
       const vehiclepositions: VehiclePositions = await response.json();
       const { entity } = vehiclepositions;
-      const markers = entity.map((entity: Entity, index: number) => {
+      const markers: JSX.Element[] = [];
+      entity.forEach((entity: Entity) => {
         const { vehicle } = entity;
         const route = routeMap.get(vehicle.trip.route_id);
         if (!route) return null;
         const { id } = route;
         const { strokeColor } = getRouteColor(route);
-        return (
+        markers.push(
           <Point
             key={vehicle.vehicle.id}
+            map={map}
             onClick={() => {
               polylines.current?.forEach((polyline) => polyline.setMap(null));
               const trip_id = vehicle.trip.trip_id;
@@ -243,25 +281,25 @@ function Maps() {
                 lat: shape.shape_pt_lat,
                 lng: shape.shape_pt_lon,
               }));
+              const zIndex = zIndexGen(id, ZIndexLayer.POLYLINE_SELECTED);
               // outline
               polylines.current[1] = new google.maps.Polyline({
                 path,
                 strokeColor: "#ffffff",
                 strokeWeight: 9,
-                zIndex: Z_INDEX_BUFFER * 2 - id,
+                zIndex: zIndex - 1,
               });
               // fill
               polylines.current[0] = new google.maps.Polyline({
                 path,
                 strokeColor,
                 strokeWeight: 6,
-                zIndex: Z_INDEX_BUFFER * 2 - id + 1,
+                zIndex: zIndex,
               });
               polylines.current?.forEach((polyline) => polyline.setMap(map));
             }}
             route={route}
             vehicle={vehicle}
-            zIndex={index * Z_INDEX_BUFFER * 2 + 1}
           />
         );
       });
@@ -277,42 +315,8 @@ function Maps() {
 
   return (
     <>
-      <GoogleMap
-        center={WELLINGTON}
-        mapContainerStyle={{
-          width: "100vw",
-          height: "100vh",
-        }}
-        mapTypeId={google.maps.MapTypeId.ROADMAP}
-        onClick={() => {
-          polylines.current?.forEach((polyline) => polyline.setMap(null));
-        }}
-        options={{
-          disableDefaultUI: true,
-          keyboardShortcuts: false,
-          styles: [
-            {
-              featureType: "poi",
-              elementType: "labels",
-              stylers: [{ visibility: "off" }],
-            },
-            {
-              featureType: "transit.line",
-              elementType: "all",
-              stylers: [{ visibility: "off" }],
-            },
-          ],
-        }}
-        ref={(ref) => {
-          setMap(ref?.state.map || null);
-        }}
-        zoom={12}
-      >
-        <TrafficLayer />
-        <TransitLayer />
-        <BicyclingLayer />
-        {markers}
-      </GoogleMap>
+      <div id="map" className={styles["maps-container"]} />
+      {markers}
       <Paper className={styles["maps-drawer-paper"]}>
         <FormGroup>
           <FormControlLabel
@@ -426,6 +430,10 @@ function Maps() {
   );
 }
 
+export function zIndexGen(id: number, layer: ZIndexLayer) {
+  return zIndexBuffer * layer - id;
+}
+
 async function getRouteMap() {
   const response = await fetch("/api/routes");
   if (!response.ok) return null;
@@ -434,7 +442,7 @@ async function getRouteMap() {
   for (const route of routes) {
     const route_id = parseInt(route.route_id);
     routeMap.set(route_id, route);
-    if (Z_INDEX_BUFFER < route_id) Z_INDEX_BUFFER = route_id;
+    if (zIndexBuffer < route_id) zIndexBuffer = route_id;
   }
   return routeMap;
 }
