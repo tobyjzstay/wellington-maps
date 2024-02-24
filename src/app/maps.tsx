@@ -278,6 +278,7 @@ function Maps() {
     else schoolBusPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, schoolBus, schoolBusPolylines]);
 
+  const [vehicleType, setVehicleType] = React.useState(false);
   React.useEffect(() => {
     async function update() {
       if (routeMap === null || shapeMap === null || tripMap === null) return;
@@ -332,18 +333,20 @@ function Maps() {
             }}
             route={route}
             vehicle={vehicle}
+            vehicleType={vehicleType}
           />
         );
       });
       setMarkers(markers);
     }
 
+    let interval: NodeJS.Timeout;
     (async () => {
       update();
-      const interval = setInterval(update, UPDATE_INTERVAL);
-      return () => clearInterval(interval);
+      interval = setInterval(update, UPDATE_INTERVAL);
     })();
-  }, [map, polylines, routeMap, shapeMap, tripMap]);
+    return () => clearInterval(interval);
+  }, [map, polylines, routeMap, shapeMap, tripMap, vehicleType]);
 
   return (
     <div className={styles["maps-container"]}>
@@ -489,6 +492,17 @@ function Maps() {
               />
             }
             label="Cable Car"
+          />
+          <FormControlLabel
+            className={styles["maps-drawer-other"]}
+            control={
+              <Checkbox
+                checked={vehicleType}
+                onChange={() => setVehicleType(!vehicleType)}
+                size="small"
+              />
+            }
+            label="Vehicle Type"
           />
         </FormGroup>
       </Drawer>

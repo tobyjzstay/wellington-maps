@@ -12,11 +12,13 @@ export function Point({
   onClick,
   route,
   vehicle,
+  vehicleType,
 }: {
   map: google.maps.Map | null;
   onClick: () => void;
   route: Route;
   vehicle: Vehicle;
+  vehicleType: boolean;
 }) {
   const { id, route_id, route_short_name, route_long_name, route_type } = route;
   const { bearing, latitude, longitude } = vehicle.position;
@@ -138,14 +140,24 @@ export function Point({
 
   React.useEffect(() => {
     marker.setMap(map);
-    typeMarker.setMap(map);
-    typeIconMarker.setMap(map);
     return () => {
       marker.setMap(null);
+    };
+  }, [map, marker]);
+
+  React.useEffect(() => {
+    if (vehicleType) {
+      typeMarker.setMap(map);
+      typeIconMarker.setMap(map);
+    } else {
+      typeMarker.setMap(null);
+      typeIconMarker.setMap(null);
+    }
+    return () => {
       typeMarker.setMap(null);
       typeIconMarker.setMap(null);
     };
-  }, [map, marker, typeIconMarker, typeMarker]);
+  }, [map, typeIconMarker, typeMarker, vehicleType]);
 
   return null;
 }

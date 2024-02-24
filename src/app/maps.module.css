@@ -9,5 +9,11 @@
 }
 
 .maps-drawer {
+  display: flex;
+  height: 100%;
   padding: 8px;
+}
+
+.maps-drawer-other {
+  margin-top: auto;
 }
