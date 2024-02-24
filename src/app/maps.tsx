@@ -122,6 +122,8 @@ function Maps() {
         lat: shape.shape_pt_lat,
         lng: shape.shape_pt_lon,
       }));
+      const bounds = new google.maps.LatLngBounds();
+      path.forEach((point) => bounds.extend(point));
       const onClick = () => {
         const zIndex = zIndexGen(id, ZIndexLayer.POLYLINE_SELECTED);
         polylines.current?.forEach((polyline) => polyline.setMap(null));
@@ -139,7 +141,9 @@ function Maps() {
           strokeWeight: 6,
           zIndex: zIndex,
         });
+        if (!map) return;
         polylines.current?.forEach((polyline) => polyline.setMap(map));
+        map.fitBounds(bounds);
       };
       const zIndex = zIndexGen(trip_route_id, ZIndexLayer.POLYLINE);
       const outline = new google.maps.Polyline({
@@ -277,6 +281,8 @@ function Maps() {
                 lat: shape.shape_pt_lat,
                 lng: shape.shape_pt_lon,
               }));
+              const bounds = new google.maps.LatLngBounds();
+              path.forEach((point) => bounds.extend(point));
               const zIndex = zIndexGen(
                 vehicle.vehicle.id,
                 ZIndexLayer.POLYLINE_SELECTED
@@ -295,7 +301,9 @@ function Maps() {
                 strokeWeight: 6,
                 zIndex: zIndex,
               });
+              if (!map) return;
               polylines.current?.forEach((polyline) => polyline.setMap(map));
+              map.fitBounds(bounds);
             }}
             route={route}
             vehicle={vehicle}
