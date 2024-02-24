@@ -18,7 +18,7 @@ export function Point({
   route: Route;
   vehicle: Vehicle;
 }) {
-  const { id, route_short_name, route_long_name, route_type } = route;
+  const { id, route_id, route_short_name, route_long_name, route_type } = route;
   const { bearing, latitude, longitude } = vehicle.position;
   const vehicle_id = vehicle.vehicle.id;
 
@@ -62,8 +62,8 @@ export function Point({
     }, [route, route_type]);
 
   const zIndex = React.useMemo(
-    () => zIndexGen(id * 3, ZIndexLayer.MARKER),
-    [id]
+    () => zIndexGen(vehicle_id, ZIndexLayer.MARKER) * 3,
+    [vehicle_id]
   );
 
   const marker = React.useMemo(

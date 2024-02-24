@@ -31,7 +31,7 @@ const WELLINGTON = {
   lng: 174.7542577,
 };
 
-let zIndexBuffer = 0;
+const Z_INDEX_BUFFER = 10000;
 export enum ZIndexLayer {
   POLYLINE,
   POLYLINE_SELECTED,
@@ -108,13 +108,7 @@ function Maps() {
   );
 
   React.useEffect(() => {
-    if (
-      map === null ||
-      routeMap === null ||
-      shapeMap === null ||
-      tripMap === null
-    )
-      return;
+    if (routeMap === null || shapeMap === null || tripMap === null) return;
     const drawnShapes: string[] = [];
     Array.from(tripMap.values()).forEach((trip) => {
       const { id, route_id: trip_route_id, shape_id } = trip;
@@ -266,7 +260,6 @@ function Maps() {
         const { vehicle } = entity;
         const route = routeMap.get(vehicle.trip.route_id);
         if (!route) return null;
-        const { id } = route;
         const { strokeColor } = getRouteColor(route);
         markers.push(
           <Point
@@ -284,7 +277,10 @@ function Maps() {
                 lat: shape.shape_pt_lat,
                 lng: shape.shape_pt_lon,
               }));
-              const zIndex = zIndexGen(id, ZIndexLayer.POLYLINE_SELECTED);
+              const zIndex = zIndexGen(
+                vehicle.vehicle.id,
+                ZIndexLayer.POLYLINE_SELECTED
+              );
               // outline
               polylines.current[1] = new google.maps.Polyline({
                 path,
@@ -450,8 +446,8 @@ function Maps() {
   );
 }
 
-export function zIndexGen(id: number, layer: ZIndexLayer) {
-  return zIndexBuffer * layer - id;
+export function zIndexGen(id: string | number, layer: ZIndexLayer) {
+  return Z_INDEX_BUFFER * layer - parseInt(String(id));
 }
 
 async function getRouteMap() {
@@ -462,7 +458,6 @@ async function getRouteMap() {
   for (const route of routes) {
     const route_id = parseInt(route.route_id);
     routeMap.set(route_id, route);
-    if (zIndexBuffer < route_id) zIndexBuffer = route_id;
   }
   return routeMap;
 }
