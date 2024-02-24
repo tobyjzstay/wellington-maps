@@ -48,28 +48,6 @@ function Maps() {
     null
   );
   const [tripMap, setTripMap] = React.useState<Map<string, Trip> | null>(null);
-
-  const [markers, setMarkers] = React.useState<JSX.Element[]>([]);
-
-  const polylines = React.useRef<google.maps.Polyline[]>([]);
-  const railPolylines = React.useRef<google.maps.Polyline[]>([]);
-  const frequentPolylines = React.useRef<google.maps.Polyline[]>([]);
-  const standardPolylines = React.useRef<google.maps.Polyline[]>([]);
-  const peakExpressExtendedPolylines = React.useRef<google.maps.Polyline[]>([]);
-  const midnightPolylines = React.useRef<google.maps.Polyline[]>([]);
-  const ferryPolylines = React.useRef<google.maps.Polyline[]>([]);
-  const cableCarPolylines = React.useRef<google.maps.Polyline[]>([]);
-  const schoolBusPolylines = React.useRef<google.maps.Polyline[]>([]);
-
-  const [rail, setRail] = React.useState(true);
-  const [frequent, setFrequent] = React.useState(true);
-  const [standard, setStandard] = React.useState(true);
-  const [peakExpressExtended, setPeakExpressExtended] = React.useState(true);
-  const [midnight, setMidnight] = React.useState(true);
-  const [ferry, setFerry] = React.useState(true);
-  const [cableCar, setCableCar] = React.useState(true);
-  const [schoolBus, setSchoolBus] = React.useState(true);
-
   const fetchingData = React.useRef(false);
   React.useEffect(() => {
     if (fetchingData.current) return;
@@ -80,10 +58,9 @@ function Maps() {
   }, []);
 
   const mapElement = document.getElementById("map");
-
   const map = React.useMemo(() => {
-    if (mapElement === null) return null;
-    return new google.maps.Map(document.getElementById("map")!, {
+    if (!mapElement) return null;
+    return new google.maps.Map(mapElement, {
       center: WELLINGTON,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       disableDefaultUI: true,
@@ -110,6 +87,15 @@ function Maps() {
   React.useEffect(() => {
     if (routeMap === null || shapeMap === null || tripMap === null) return;
     const drawnShapes: string[] = [];
+
+    const railPolylines: google.maps.Polyline[] = [];
+    const frequentPolylines: google.maps.Polyline[] = [];
+    const standardPolylines: google.maps.Polyline[] = [];
+    const peakExpressExtendedPolylines: google.maps.Polyline[] = [];
+    const midnightPolylines: google.maps.Polyline[] = [];
+    const ferryPolylines: google.maps.Polyline[] = [];
+    const cableCarPolylines: google.maps.Polyline[] = [];
+    const schoolBusPolylines: google.maps.Polyline[] = [];
     Array.from(tripMap.values()).forEach((trip) => {
       const { id, route_id: trip_route_id, shape_id } = trip;
       const route = routeMap.get(trip_route_id);
@@ -147,7 +133,6 @@ function Maps() {
       };
       const zIndex = zIndexGen(trip_route_id, ZIndexLayer.POLYLINE);
       const outline = new google.maps.Polyline({
-        map,
         path,
         strokeColor: "#ffffff",
         strokeWeight: 3,
@@ -155,7 +140,6 @@ function Maps() {
       });
       outline.addListener("click", onClick);
       const fill = new google.maps.Polyline({
-        map,
         path,
         strokeColor,
         strokeWeight: 2,
@@ -164,94 +148,135 @@ function Maps() {
       fill.addListener("click", onClick);
       switch (route_type) {
         case RouteType.RAIL:
-          railPolylines.current.push(outline, fill);
+          railPolylines.push(outline, fill);
           break;
         case RouteType.BUS:
           switch (getBusRouteType(route_id)) {
             case BusRouteType.FREQUENT:
-              frequentPolylines.current.push(outline, fill);
+              frequentPolylines.push(outline, fill);
               break;
             case BusRouteType.STANDARD:
-              standardPolylines.current.push(outline, fill);
+              standardPolylines.push(outline, fill);
               break;
             case BusRouteType.PEAK_EXPRESS_EXTENDED:
-              peakExpressExtendedPolylines.current.push(outline, fill);
+              peakExpressExtendedPolylines.push(outline, fill);
               break;
             case BusRouteType.MIDNIGHT:
-              midnightPolylines.current.push(outline, fill);
+              midnightPolylines.push(outline, fill);
               break;
             default:
               break;
           }
           break;
         case RouteType.FERRY:
-          ferryPolylines.current.push(outline, fill);
+          ferryPolylines.push(outline, fill);
           break;
         case RouteType.CABLE_CAR:
-          cableCarPolylines.current.push(outline, fill);
+          cableCarPolylines.push(outline, fill);
           break;
         case RouteType.SCHOOL_BUS:
-          schoolBusPolylines.current.push(outline, fill);
+          schoolBusPolylines.push(outline, fill);
           break;
         default:
           break;
       }
       drawnShapes.push(shape_id);
     });
+    setRailPolylines(railPolylines);
+    setFrequentPolylines(frequentPolylines);
+    setStandardPolylines(standardPolylines);
+    setPeakExpressExtendedPolylines(peakExpressExtendedPolylines);
+    setMidnightPolylines(midnightPolylines);
+    setFerryPolylines(ferryPolylines);
+    setCableCarPolylines(cableCarPolylines);
+    setSchoolPolylines(schoolBusPolylines);
   }, [map, routeMap, shapeMap, tripMap]);
 
-  React.useEffect(() => {
-    if (rail) railPolylines.current.forEach((polyline) => polyline.setMap(map));
-    else railPolylines.current.forEach((polyline) => polyline.setMap(null));
-  }, [map, rail]);
+  const [markers, setMarkers] = React.useState<JSX.Element[]>([]);
 
-  React.useEffect(() => {
-    if (frequent)
-      frequentPolylines.current.forEach((polyline) => polyline.setMap(map));
-    else frequentPolylines.current.forEach((polyline) => polyline.setMap(null));
-  }, [map, frequent]);
+  const polylines = React.useRef<google.maps.Polyline[]>([]);
 
+  const [rail, setRail] = React.useState(true);
+  const [railPolylines, setRailPolylines] = React.useState<
+    google.maps.Polyline[] | null
+  >(null);
   React.useEffect(() => {
-    if (standard)
-      standardPolylines.current.forEach((polyline) => polyline.setMap(map));
-    else standardPolylines.current.forEach((polyline) => polyline.setMap(null));
-  }, [map, standard]);
+    if (!railPolylines) return;
+    if (rail) railPolylines.forEach((polyline) => polyline.setMap(map));
+    else railPolylines.forEach((polyline) => polyline.setMap(null));
+  }, [map, rail, railPolylines]);
 
+  const [frequent, setFrequent] = React.useState(true);
+  const [frequentPolylines, setFrequentPolylines] = React.useState<
+    google.maps.Polyline[] | null
+  >(null);
   React.useEffect(() => {
+    if (!frequentPolylines) return;
+    if (frequent) frequentPolylines.forEach((polyline) => polyline.setMap(map));
+    else frequentPolylines.forEach((polyline) => polyline.setMap(null));
+  }, [map, frequent, frequentPolylines]);
+
+  const [standard, setStandard] = React.useState(true);
+  const [standardPolylines, setStandardPolylines] = React.useState<
+    google.maps.Polyline[] | null
+  >(null);
+  React.useEffect(() => {
+    if (!standardPolylines) return;
+    if (standard) standardPolylines.forEach((polyline) => polyline.setMap(map));
+    else standardPolylines.forEach((polyline) => polyline.setMap(null));
+  }, [map, standard, standardPolylines]);
+
+  const [peakExpressExtended, setPeakExpressExtended] = React.useState(true);
+  const [peakExpressExtendedPolylines, setPeakExpressExtendedPolylines] =
+    React.useState<google.maps.Polyline[] | null>(null);
+  React.useEffect(() => {
+    if (!peakExpressExtendedPolylines) return;
     if (peakExpressExtended)
-      peakExpressExtendedPolylines.current.forEach((polyline) =>
-        polyline.setMap(map)
-      );
+      peakExpressExtendedPolylines.forEach((polyline) => polyline.setMap(map));
     else
-      peakExpressExtendedPolylines.current.forEach((polyline) =>
-        polyline.setMap(null)
-      );
-  }, [map, peakExpressExtended]);
+      peakExpressExtendedPolylines.forEach((polyline) => polyline.setMap(null));
+  }, [map, peakExpressExtended, peakExpressExtendedPolylines]);
 
+  const [midnight, setMidnight] = React.useState(false);
+  const [midnightPolylines, setMidnightPolylines] = React.useState<
+    google.maps.Polyline[] | null
+  >(null);
   React.useEffect(() => {
-    if (midnight)
-      midnightPolylines.current.forEach((polyline) => polyline.setMap(map));
-    else midnightPolylines.current.forEach((polyline) => polyline.setMap(null));
-  }, [map, midnight]);
+    if (!midnightPolylines) return;
+    if (midnight) midnightPolylines.forEach((polyline) => polyline.setMap(map));
+    else midnightPolylines.forEach((polyline) => polyline.setMap(null));
+  }, [map, midnight, midnightPolylines]);
 
+  const [ferry, setFerry] = React.useState(true);
+  const [ferryPolylines, setFerryPolylines] = React.useState<
+    google.maps.Polyline[] | null
+  >(null);
   React.useEffect(() => {
-    if (ferry)
-      ferryPolylines.current.forEach((polyline) => polyline.setMap(map));
-    else ferryPolylines.current.forEach((polyline) => polyline.setMap(null));
-  }, [map, ferry]);
+    if (!ferryPolylines) return;
+    if (ferry) ferryPolylines.forEach((polyline) => polyline.setMap(map));
+    else ferryPolylines.forEach((polyline) => polyline.setMap(null));
+  }, [map, ferry, ferryPolylines]);
 
+  const [cableCar, setCableCar] = React.useState(true);
+  const [cableCarPolylines, setCableCarPolylines] = React.useState<
+    google.maps.Polyline[] | null
+  >(null);
   React.useEffect(() => {
-    if (cableCar)
-      cableCarPolylines.current.forEach((polyline) => polyline.setMap(map));
-    else cableCarPolylines.current.forEach((polyline) => polyline.setMap(null));
-  }, [map, cableCar]);
+    if (!cableCarPolylines) return;
+    if (cableCar) cableCarPolylines.forEach((polyline) => polyline.setMap(map));
+    else cableCarPolylines.forEach((polyline) => polyline.setMap(null));
+  }, [map, cableCar, cableCarPolylines]);
 
+  const [schoolBus, setSchoolBus] = React.useState(false);
+  const [schoolBusPolylines, setSchoolPolylines] = React.useState<
+    google.maps.Polyline[] | null
+  >(null);
   React.useEffect(() => {
+    if (!schoolBusPolylines) return;
     if (schoolBus)
-      schoolBusPolylines.current.forEach((polyline) => polyline.setMap(map));
-    else
-      schoolBusPolylines.current.forEach((polyline) => polyline.setMap(null));
-  }, [map, schoolBus]);
+      schoolBusPolylines.forEach((polyline) => polyline.setMap(map));
+    else schoolBusPolylines.forEach((polyline) => polyline.setMap(null));
+  }, [map, schoolBus, schoolBusPolylines]);
 
   React.useEffect(() => {
     async function update() {
@@ -355,19 +380,38 @@ function Maps() {
             control={
               <Checkbox
                 checked={
-                  frequent && standard && peakExpressExtended && midnight
+                  frequent &&
+                  standard &&
+                  peakExpressExtended &&
+                  midnight &&
+                  schoolBus
                 }
                 indeterminate={
-                  (frequent || standard || peakExpressExtended || midnight) &&
-                  !(frequent && standard && peakExpressExtended && midnight)
+                  (frequent ||
+                    standard ||
+                    peakExpressExtended ||
+                    midnight ||
+                    schoolBus) &&
+                  !(
+                    frequent &&
+                    standard &&
+                    peakExpressExtended &&
+                    midnight &&
+                    schoolBus
+                  )
                 }
                 onChange={() => {
                   const state =
-                    frequent || standard || peakExpressExtended || midnight;
+                    frequent ||
+                    standard ||
+                    peakExpressExtended ||
+                    midnight ||
+                    schoolBus;
                   setFrequent(!state);
                   setStandard(!state);
                   setPeakExpressExtended(!state);
                   setMidnight(!state);
+                  setSchoolBus(!state);
                 }}
                 size="small"
               />
@@ -415,6 +459,16 @@ function Maps() {
               }
               label="Midnight"
             />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={schoolBus}
+                  onChange={() => setSchoolBus(!schoolBus)}
+                  size="small"
+                />
+              }
+              label="School"
+            />
           </Box>
           <FormControlLabel
             control={
@@ -435,16 +489,6 @@ function Maps() {
               />
             }
             label="Cable Car"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={schoolBus}
-                onChange={() => setSchoolBus(!schoolBus)}
-                size="small"
-              />
-            }
-            label="School Bus"
           />
         </FormGroup>
       </Drawer>
