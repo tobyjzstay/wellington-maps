@@ -291,6 +291,42 @@ function Maps() {
         const route = routeMap.get(vehicle.trip.route_id);
         if (!route) return null;
         const { strokeColor } = getRouteColor(route);
+        const { route_id, route_type } = route;
+        let visible = true;
+        switch (route_type) {
+          case RouteType.RAIL:
+            visible = rail;
+            break;
+          case RouteType.BUS:
+            switch (getBusRouteType(route_id)) {
+              case BusRouteType.FREQUENT:
+                visible = frequent;
+                break;
+              case BusRouteType.STANDARD:
+                visible = standard;
+                break;
+              case BusRouteType.PEAK_EXPRESS_EXTENDED:
+                visible = peakExpressExtended;
+                break;
+              case BusRouteType.MIDNIGHT:
+                visible = midnight;
+                break;
+              default:
+                break;
+            }
+            break;
+          case RouteType.FERRY:
+            visible = ferry;
+            break;
+          case RouteType.CABLE_CAR:
+            visible = cableCar;
+            break;
+          case RouteType.SCHOOL_BUS:
+            visible = schoolBus;
+            break;
+          default:
+            break;
+        }
         markers.push(
           <Point
             key={vehicle.vehicle.id}
@@ -334,6 +370,7 @@ function Maps() {
             route={route}
             vehicle={vehicle}
             vehicleType={vehicleType}
+            visible={visible}
           />
         );
       });
@@ -346,7 +383,22 @@ function Maps() {
       interval = setInterval(update, UPDATE_INTERVAL);
     })();
     return () => clearInterval(interval);
-  }, [map, polylines, routeMap, shapeMap, tripMap, vehicleType]);
+  }, [
+    cableCar,
+    ferry,
+    frequent,
+    map,
+    midnight,
+    peakExpressExtended,
+    polylines,
+    rail,
+    routeMap,
+    schoolBus,
+    shapeMap,
+    standard,
+    tripMap,
+    vehicleType,
+  ]);
 
   return (
     <div className={styles["maps-container"]}>
