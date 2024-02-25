@@ -403,16 +403,9 @@ function Maps() {
   return (
     <div className={styles["maps-container"]}>
       <Drawer
-        sx={{
-          width: 300,
-          flexShrink: 0,
-          "& .MuiDrawer-paper": {
-            width: 300,
-            boxSizing: "border-box",
-          },
-        }}
-        variant="permanent"
         anchor="left"
+        className={styles["maps-drawer"]}
+        variant="permanent"
       >
         <Toolbar>
           <Typography variant="h6" noWrap>
@@ -420,7 +413,7 @@ function Maps() {
           </Typography>
         </Toolbar>
         <Divider />
-        <FormGroup className={styles["maps-drawer"]}>
+        <FormGroup className={styles["maps-drawer-options"]}>
           <FormControlLabel
             control={
               <Checkbox
@@ -473,7 +466,7 @@ function Maps() {
             }
             label="Bus"
           />
-          <Box sx={{ display: "flex", flexDirection: "column", ml: 3 }}>
+          <Box className={styles["maps-drawer-options-bus"]}>
             <FormControlLabel
               control={
                 <Checkbox
@@ -546,7 +539,7 @@ function Maps() {
             label="Cable Car"
           />
           <FormControlLabel
-            className={styles["maps-drawer-other"]}
+            className={styles["maps-drawer-options-other"]}
             control={
               <Checkbox
                 checked={vehicleType}
