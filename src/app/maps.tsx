@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import React from "react";
+import simplify from "simplify-js";
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Trip } from "./api/trips/route";
@@ -48,6 +49,7 @@ function Maps() {
     null
   );
   const [tripMap, setTripMap] = React.useState<Map<string, Trip> | null>(null);
+  const [zoom, setZoom] = React.useState(12);
   const fetchingData = React.useRef(false);
   React.useEffect(() => {
     if (fetchingData.current) return;
@@ -77,12 +79,17 @@ function Maps() {
           stylers: [{ visibility: "off" }],
         },
       ],
-      zoom: 12,
+      zoom,
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapElement]);
   map?.addListener("click", () =>
     polylines.current?.forEach((polyline) => polyline.setMap(null))
   );
+
+  map?.addListener("zoom_changed", () => {
+    setZoom(map.getZoom()!);
+  });
 
   React.useEffect(() => {
     if (routeMap === null || shapeMap === null || tripMap === null) return;
@@ -104,10 +111,19 @@ function Maps() {
       const shapes = shapeMap.get(shape_id);
       if (!shapes) return;
       const { strokeColor } = getRouteColor(route);
-      const path = shapes.map((shape) => ({
+      let path = shapes.map((shape) => ({
         lat: shape.shape_pt_lat,
         lng: shape.shape_pt_lon,
       }));
+
+      const tolerance = 0.0001 * Math.pow(2, 12 - zoom);
+      const simplifiedPath = simplify(
+        path.map((point) => ({ x: point.lng, y: point.lat })),
+        tolerance,
+        true
+      );
+      path = simplifiedPath.map((point) => ({ lat: point.y, lng: point.x }));
+
       const bounds = new google.maps.LatLngBounds();
       path.forEach((point) => bounds.extend(point));
       const onClick = () => {
@@ -190,7 +206,7 @@ function Maps() {
     setFerryPolylines(ferryPolylines);
     setCableCarPolylines(cableCarPolylines);
     setSchoolPolylines(schoolBusPolylines);
-  }, [map, routeMap, shapeMap, tripMap]);
+  }, [map, routeMap, shapeMap, tripMap, zoom]);
 
   const [markers, setMarkers] = React.useState<JSX.Element[]>([]);
 
@@ -203,7 +219,7 @@ function Maps() {
   React.useEffect(() => {
     if (!railPolylines) return;
     if (rail) railPolylines.forEach((polyline) => polyline.setMap(map));
-    else railPolylines.forEach((polyline) => polyline.setMap(null));
+    return () => railPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, rail, railPolylines]);
 
   const [frequent, setFrequent] = React.useState(true);
@@ -213,7 +229,7 @@ function Maps() {
   React.useEffect(() => {
     if (!frequentPolylines) return;
     if (frequent) frequentPolylines.forEach((polyline) => polyline.setMap(map));
-    else frequentPolylines.forEach((polyline) => polyline.setMap(null));
+    return () => frequentPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, frequent, frequentPolylines]);
 
   const [standard, setStandard] = React.useState(true);
@@ -223,7 +239,7 @@ function Maps() {
   React.useEffect(() => {
     if (!standardPolylines) return;
     if (standard) standardPolylines.forEach((polyline) => polyline.setMap(map));
-    else standardPolylines.forEach((polyline) => polyline.setMap(null));
+    return () => standardPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, standard, standardPolylines]);
 
   const [peakExpressExtended, setPeakExpressExtended] = React.useState(true);
@@ -233,7 +249,7 @@ function Maps() {
     if (!peakExpressExtendedPolylines) return;
     if (peakExpressExtended)
       peakExpressExtendedPolylines.forEach((polyline) => polyline.setMap(map));
-    else
+    return () =>
       peakExpressExtendedPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, peakExpressExtended, peakExpressExtendedPolylines]);
 
@@ -244,7 +260,7 @@ function Maps() {
   React.useEffect(() => {
     if (!midnightPolylines) return;
     if (midnight) midnightPolylines.forEach((polyline) => polyline.setMap(map));
-    else midnightPolylines.forEach((polyline) => polyline.setMap(null));
+    return () => midnightPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, midnight, midnightPolylines]);
 
   const [ferry, setFerry] = React.useState(true);
@@ -254,7 +270,7 @@ function Maps() {
   React.useEffect(() => {
     if (!ferryPolylines) return;
     if (ferry) ferryPolylines.forEach((polyline) => polyline.setMap(map));
-    else ferryPolylines.forEach((polyline) => polyline.setMap(null));
+    return () => ferryPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, ferry, ferryPolylines]);
 
   const [cableCar, setCableCar] = React.useState(true);
@@ -264,7 +280,7 @@ function Maps() {
   React.useEffect(() => {
     if (!cableCarPolylines) return;
     if (cableCar) cableCarPolylines.forEach((polyline) => polyline.setMap(map));
-    else cableCarPolylines.forEach((polyline) => polyline.setMap(null));
+    return () => cableCarPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, cableCar, cableCarPolylines]);
 
   const [schoolBus, setSchoolBus] = React.useState(false);
@@ -275,7 +291,8 @@ function Maps() {
     if (!schoolBusPolylines) return;
     if (schoolBus)
       schoolBusPolylines.forEach((polyline) => polyline.setMap(map));
-    else schoolBusPolylines.forEach((polyline) => polyline.setMap(null));
+    return () =>
+      schoolBusPolylines.forEach((polyline) => polyline.setMap(null));
   }, [map, schoolBus, schoolBusPolylines]);
 
   const [vehicleType, setVehicleType] = React.useState(false);
