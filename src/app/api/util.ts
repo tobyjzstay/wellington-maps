@@ -27,7 +27,7 @@ export async function fetchMetlink(
 }
 export type Cache<T> = {
   body: string;
-  data: T;
+  data: T | T[];
   timestamp: number;
 };
 
@@ -64,7 +64,7 @@ export async function fetchMetlinkFull() {
         const text = await file.async("text");
         let headers: string[] | null = null;
         let name = file.name.slice(0, ".txt".length * -1) as keyof Full;
-        const data: (typeof full.data)[typeof name] = [];
+        const data: Full[typeof name] = [];
         for (const line of text.split("\n")) {
           if (headers === null) {
             headers = line.split(",");
@@ -212,7 +212,7 @@ export async function fetchMetlinkFull() {
     }
   );
 
-  return full.data;
+  return (full.data || {}) as Full;
 }
 
 export async function cacheRequest<T>(
@@ -223,16 +223,19 @@ export async function cacheRequest<T>(
   init?: RequestInit | undefined
 ) {
   const timestamp = new Date().getTime();
-  if (
-    Object.keys(cache).length === 0 ||
-    timestamp - cache.timestamp >= revalidate * 1000
-  ) {
-    cache.timestamp = timestamp;
-    const response = await fetch(input, {
-      ...init,
-      cache: "no-cache",
-    });
+
+  if (!cache.timestamp || timestamp - cache.timestamp >= revalidate * 1000) {
+    console.info("Cache expired or empty. Fetching new data...");
+    const response = await fetch(input, { ...init, cache: "no-cache" });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch ${input}:`, response.statusText);
+      return;
+    }
+
     const data = await handleResponse(response);
+    cache.timestamp = timestamp;
+    cache.data = data;
     cache.body = JSON.stringify(data, null, 2);
   }
 }
