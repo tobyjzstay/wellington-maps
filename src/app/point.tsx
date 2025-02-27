@@ -76,7 +76,7 @@ export function Point({
     }, [route, route_type]);
 
   const zIndex = React.useMemo(
-    () => zIndexGen(vehicle_id, ZIndexLayer.MARKER) * 3,
+    () => zIndexGen(parseInt(vehicle_id), ZIndexLayer.MARKER) * 3,
     [vehicle_id]
   );
 

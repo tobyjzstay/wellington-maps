@@ -21,6 +21,7 @@ import styles from "./maps.module.css";
 import { Point } from "./point";
 import {
   BusRouteType,
+  RouteId,
   RouteType,
   getBusRouteType,
   getRouteColor,
@@ -40,6 +41,8 @@ export enum ZIndexLayer {
 }
 
 export const MapContext = React.createContext<google.maps.Map | null>(null);
+
+const routeIdValues = Object.values(RouteId);
 
 function Maps() {
   const [routeMap, setRouteMap] = React.useState<Map<number, Route> | null>(
@@ -147,7 +150,10 @@ function Maps() {
         polylines.current?.forEach((polyline) => polyline.setMap(map));
         map.fitBounds(bounds);
       };
-      const zIndex = zIndexGen(trip_route_id, ZIndexLayer.POLYLINE);
+      const zIndex = zIndexGen(
+        routeIdValues.indexOf(String(trip_route_id) as RouteId),
+        ZIndexLayer.POLYLINE
+      );
       const outline = new google.maps.Polyline({
         path,
         strokeColor: "#ffffff",
@@ -363,7 +369,7 @@ function Maps() {
               const bounds = new google.maps.LatLngBounds();
               path.forEach((point) => bounds.extend(point));
               const zIndex = zIndexGen(
-                vehicle.vehicle.id,
+                parseInt(vehicle.vehicle.id),
                 ZIndexLayer.POLYLINE_SELECTED
               );
               // outline
@@ -574,8 +580,8 @@ function Maps() {
   );
 }
 
-export function zIndexGen(id: string | number, layer: ZIndexLayer) {
-  return Z_INDEX_BUFFER * layer - parseInt(String(id));
+export function zIndexGen(id: number, layer: ZIndexLayer) {
+  return Z_INDEX_BUFFER * (layer + 1) - id;
 }
 
 async function getRouteMap() {
