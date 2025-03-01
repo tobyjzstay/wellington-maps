@@ -27,13 +27,10 @@ import {
   getRouteColor,
 } from "./util";
 
+const CENTER = { lat: -41.2529601, lng: 174.7542577 };
 const UPDATE_INTERVAL = 5000;
-const WELLINGTON = {
-  lat: -41.2529601,
-  lng: 174.7542577,
-};
-
 const Z_INDEX_BUFFER = 10000;
+
 export enum ZIndexLayer {
   POLYLINE,
   POLYLINE_SELECTED,
@@ -54,6 +51,7 @@ function Maps() {
   const [tripMap, setTripMap] = React.useState<Map<string, Trip> | null>(null);
   const [zoom, setZoom] = React.useState(12);
   const fetchingData = React.useRef(false);
+
   React.useEffect(() => {
     if (fetchingData.current) return;
     fetchingData.current = true;
@@ -65,8 +63,8 @@ function Maps() {
   const mapElement = document.getElementById("map");
   const map = React.useMemo(() => {
     if (!mapElement) return null;
-    return new google.maps.Map(mapElement, {
-      center: WELLINGTON,
+    const map = new google.maps.Map(mapElement, {
+      center: CENTER,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       disableDefaultUI: true,
       keyboardShortcuts: false,
@@ -84,32 +82,37 @@ function Maps() {
       ],
       zoom,
     });
+
+    map?.addListener("click", () => {
+      setSelectedPolylines([]);
+    });
+
+    map.addListener("zoom_changed", () => {
+      setZoom(map.getZoom()!);
+    });
+
+    return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapElement]);
-  map?.addListener("click", () =>
-    polylines.current?.forEach((polyline) => polyline.setMap(null))
-  );
 
-  map?.addListener("zoom_changed", () => {
-    setZoom(map.getZoom()!);
-  });
+  const [selectedPolylines, setSelectedPolylines] = React.useState<
+    google.maps.Polyline[]
+  >([]);
 
   React.useEffect(() => {
     if (routeMap === null || shapeMap === null || tripMap === null) return;
-    const drawnShapes: string[] = [];
 
-    const railPolylines: google.maps.Polyline[] = [];
-    const frequentPolylines: google.maps.Polyline[] = [];
-    const standardPolylines: google.maps.Polyline[] = [];
-    const peakExpressExtendedPolylines: google.maps.Polyline[] = [];
-    const midnightPolylines: google.maps.Polyline[] = [];
-    const ferryPolylines: google.maps.Polyline[] = [];
-    const cableCarPolylines: google.maps.Polyline[] = [];
-    const schoolBusPolylines: google.maps.Polyline[] = [];
+    const drawnShapes: string[] = [];
+    const newRoutePolylines = new Map<RouteType, google.maps.Polyline[]>();
+    const newBusRoutePolylines = new Map<
+      BusRouteType,
+      google.maps.Polyline[]
+    >();
+
     Array.from(tripMap.values()).forEach((trip) => {
       const { id, route_id: trip_route_id, shape_id } = trip;
       const route = routeMap.get(trip_route_id);
-      if (!route || drawnShapes.indexOf(shape_id) >= 0) return;
+      if (!route || drawnShapes.includes(shape_id)) return;
       const { route_id, route_type } = route;
       const shapes = shapeMap.get(shape_id);
       if (!shapes) return;
@@ -130,28 +133,26 @@ function Maps() {
       const bounds = new google.maps.LatLngBounds();
       path.forEach((point) => bounds.extend(point));
       const onClick = () => {
+        if (!map) return;
         const zIndex = zIndexGen(id, ZIndexLayer.POLYLINE_SELECTED);
-        polylines.current?.forEach((polyline) => polyline.setMap(null));
-        // outline
-        polylines.current[1] = new google.maps.Polyline({
+        selectedPolylines.forEach((polyline) => polyline.setMap(null));
+        const outline = new google.maps.Polyline({
           path,
           strokeColor: "#ffffff",
           strokeWeight: 9,
           zIndex: zIndex - 1,
         });
-        // fill
-        polylines.current[0] = new google.maps.Polyline({
+        const fill = new google.maps.Polyline({
           path,
           strokeColor,
           strokeWeight: 6,
           zIndex: zIndex,
         });
-        if (!map) return;
-        polylines.current?.forEach((polyline) => polyline.setMap(map));
+        setSelectedPolylines([outline, fill]);
         map.fitBounds(bounds);
       };
       const zIndex = zIndexGen(
-        routeIdValues.indexOf(String(trip_route_id) as RouteId),
+        routeIdValues.indexOf(route_id),
         ZIndexLayer.POLYLINE
       );
       const outline = new google.maps.Polyline({
@@ -168,138 +169,111 @@ function Maps() {
         zIndex: zIndex,
       });
       fill.addListener("click", onClick);
-      switch (route_type) {
-        case RouteType.RAIL:
-          railPolylines.push(outline, fill);
-          break;
-        case RouteType.BUS:
-          switch (getBusRouteType(route_id)) {
-            case BusRouteType.FREQUENT:
-              frequentPolylines.push(outline, fill);
-              break;
-            case BusRouteType.STANDARD:
-              standardPolylines.push(outline, fill);
-              break;
-            case BusRouteType.PEAK_EXPRESS_EXTENDED:
-              peakExpressExtendedPolylines.push(outline, fill);
-              break;
-            case BusRouteType.MIDNIGHT:
-              midnightPolylines.push(outline, fill);
-              break;
-            default:
-              break;
-          }
-          break;
-        case RouteType.FERRY:
-          ferryPolylines.push(outline, fill);
-          break;
-        case RouteType.CABLE_CAR:
-          cableCarPolylines.push(outline, fill);
-          break;
-        case RouteType.SCHOOL_BUS:
-          schoolBusPolylines.push(outline, fill);
-          break;
-        default:
-          break;
-      }
+
       drawnShapes.push(shape_id);
+
+      if (route_type === RouteType.BUS) {
+        const busRouteType = getBusRouteType(route_id)!;
+        if (!newBusRoutePolylines.has(busRouteType))
+          newBusRoutePolylines.set(busRouteType, []);
+        newBusRoutePolylines.get(busRouteType)!.push(outline, fill);
+      } else {
+        if (!newRoutePolylines.has(route_type))
+          newRoutePolylines.set(route_type, []);
+        newRoutePolylines.get(route_type)!.push(outline, fill);
+      }
     });
-    setRailPolylines(railPolylines);
-    setFrequentPolylines(frequentPolylines);
-    setStandardPolylines(standardPolylines);
-    setPeakExpressExtendedPolylines(peakExpressExtendedPolylines);
-    setMidnightPolylines(midnightPolylines);
-    setFerryPolylines(ferryPolylines);
-    setCableCarPolylines(cableCarPolylines);
-    setSchoolPolylines(schoolBusPolylines);
+    setBusRoutePolylines(newBusRoutePolylines);
+    setRoutePolylines(newRoutePolylines);
+    return () => {
+      newRoutePolylines.forEach((polylines) =>
+        polylines.forEach((polyline) => polyline.setMap(null))
+      );
+      newBusRoutePolylines.forEach((polylines) =>
+        polylines.forEach((polyline) => polyline.setMap(null))
+      );
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, routeMap, shapeMap, tripMap, zoom]);
 
   const [markers, setMarkers] = React.useState<JSX.Element[]>([]);
 
-  const polylines = React.useRef<google.maps.Polyline[]>([]);
+  const [routePolylines, setRoutePolylines] = React.useState<
+    Map<RouteType, google.maps.Polyline[]>
+  >(new Map());
+  const [busRoutePolylines, setBusRoutePolylines] = React.useState<
+    Map<BusRouteType, google.maps.Polyline[]>
+  >(new Map());
 
   const [rail, setRail] = React.useState(true);
-  const [railPolylines, setRailPolylines] = React.useState<
-    google.maps.Polyline[] | null
-  >(null);
-  React.useEffect(() => {
-    if (!railPolylines) return;
-    if (rail) railPolylines.forEach((polyline) => polyline.setMap(map));
-    return () => railPolylines.forEach((polyline) => polyline.setMap(null));
-  }, [map, rail, railPolylines]);
-
   const [frequent, setFrequent] = React.useState(true);
-  const [frequentPolylines, setFrequentPolylines] = React.useState<
-    google.maps.Polyline[] | null
-  >(null);
-  React.useEffect(() => {
-    if (!frequentPolylines) return;
-    if (frequent) frequentPolylines.forEach((polyline) => polyline.setMap(map));
-    return () => frequentPolylines.forEach((polyline) => polyline.setMap(null));
-  }, [map, frequent, frequentPolylines]);
-
   const [standard, setStandard] = React.useState(true);
-  const [standardPolylines, setStandardPolylines] = React.useState<
-    google.maps.Polyline[] | null
-  >(null);
-  React.useEffect(() => {
-    if (!standardPolylines) return;
-    if (standard) standardPolylines.forEach((polyline) => polyline.setMap(map));
-    return () => standardPolylines.forEach((polyline) => polyline.setMap(null));
-  }, [map, standard, standardPolylines]);
-
   const [peakExpressExtended, setPeakExpressExtended] = React.useState(true);
-  const [peakExpressExtendedPolylines, setPeakExpressExtendedPolylines] =
-    React.useState<google.maps.Polyline[] | null>(null);
-  React.useEffect(() => {
-    if (!peakExpressExtendedPolylines) return;
-    if (peakExpressExtended)
-      peakExpressExtendedPolylines.forEach((polyline) => polyline.setMap(map));
-    return () =>
-      peakExpressExtendedPolylines.forEach((polyline) => polyline.setMap(null));
-  }, [map, peakExpressExtended, peakExpressExtendedPolylines]);
-
   const [midnight, setMidnight] = React.useState(false);
-  const [midnightPolylines, setMidnightPolylines] = React.useState<
-    google.maps.Polyline[] | null
-  >(null);
-  React.useEffect(() => {
-    if (!midnightPolylines) return;
-    if (midnight) midnightPolylines.forEach((polyline) => polyline.setMap(map));
-    return () => midnightPolylines.forEach((polyline) => polyline.setMap(null));
-  }, [map, midnight, midnightPolylines]);
-
   const [ferry, setFerry] = React.useState(true);
-  const [ferryPolylines, setFerryPolylines] = React.useState<
-    google.maps.Polyline[] | null
-  >(null);
-  React.useEffect(() => {
-    if (!ferryPolylines) return;
-    if (ferry) ferryPolylines.forEach((polyline) => polyline.setMap(map));
-    return () => ferryPolylines.forEach((polyline) => polyline.setMap(null));
-  }, [map, ferry, ferryPolylines]);
-
   const [cableCar, setCableCar] = React.useState(true);
-  const [cableCarPolylines, setCableCarPolylines] = React.useState<
-    google.maps.Polyline[] | null
-  >(null);
-  React.useEffect(() => {
-    if (!cableCarPolylines) return;
-    if (cableCar) cableCarPolylines.forEach((polyline) => polyline.setMap(map));
-    return () => cableCarPolylines.forEach((polyline) => polyline.setMap(null));
-  }, [map, cableCar, cableCarPolylines]);
-
   const [schoolBus, setSchoolBus] = React.useState(false);
-  const [schoolBusPolylines, setSchoolPolylines] = React.useState<
-    google.maps.Polyline[] | null
-  >(null);
+
+  const getVisibility = React.useCallback(
+    (routeType: RouteType, busRouteType?: BusRouteType) => {
+      switch (routeType) {
+        case RouteType.RAIL:
+          return rail;
+        case RouteType.BUS:
+          switch (busRouteType) {
+            case BusRouteType.FREQUENT:
+              return frequent;
+            case BusRouteType.STANDARD:
+              return standard;
+            case BusRouteType.PEAK_EXPRESS_EXTENDED:
+              return peakExpressExtended;
+            case BusRouteType.MIDNIGHT:
+              return midnight;
+            default:
+              return false;
+          }
+        case RouteType.FERRY:
+          return ferry;
+        case RouteType.CABLE_CAR:
+          return cableCar;
+        case RouteType.SCHOOL_BUS:
+          return schoolBus;
+        case RouteType.BUS:
+        default:
+          return false;
+      }
+    },
+    [
+      rail,
+      frequent,
+      standard,
+      peakExpressExtended,
+      midnight,
+      ferry,
+      cableCar,
+      schoolBus,
+    ]
+  );
+
   React.useEffect(() => {
-    if (!schoolBusPolylines) return;
-    if (schoolBus)
-      schoolBusPolylines.forEach((polyline) => polyline.setMap(map));
-    return () =>
-      schoolBusPolylines.forEach((polyline) => polyline.setMap(null));
-  }, [map, schoolBus, schoolBusPolylines]);
+    if (!map) return;
+    routePolylines.forEach((polylines, routeType) => {
+      const isVisible = getVisibility(routeType);
+      polylines.forEach((polyline) => polyline.setMap(isVisible ? map : null));
+    });
+    busRoutePolylines.forEach((polylines, routeType) => {
+      const isVisible = getVisibility(RouteType.BUS, routeType);
+      polylines.forEach((polyline) => polyline.setMap(isVisible ? map : null));
+    });
+  }, [map, routePolylines, busRoutePolylines, getVisibility]);
+
+  React.useEffect(() => {
+    if (!map) return;
+    selectedPolylines.forEach((polyline) => polyline.setMap(map));
+    return () => {
+      selectedPolylines.forEach((polyline) => polyline.setMap(null));
+    };
+  }, [selectedPolylines, map]);
 
   const [vehicleType, setVehicleType] = React.useState(false);
   React.useEffect(() => {
@@ -315,85 +289,55 @@ function Maps() {
         if (!route) return null;
         const { strokeColor } = getRouteColor(route);
         const { route_id, route_type } = route;
-        let visible = true;
-        switch (route_type) {
-          case RouteType.RAIL:
-            visible = rail;
-            break;
-          case RouteType.BUS:
-            switch (getBusRouteType(route_id)) {
-              case BusRouteType.FREQUENT:
-                visible = frequent;
-                break;
-              case BusRouteType.STANDARD:
-                visible = standard;
-                break;
-              case BusRouteType.PEAK_EXPRESS_EXTENDED:
-                visible = peakExpressExtended;
-                break;
-              case BusRouteType.MIDNIGHT:
-                visible = midnight;
-                break;
-              default:
-                break;
-            }
-            break;
-          case RouteType.FERRY:
-            visible = ferry;
-            break;
-          case RouteType.CABLE_CAR:
-            visible = cableCar;
-            break;
-          case RouteType.SCHOOL_BUS:
-            visible = schoolBus;
-            break;
-          default:
-            break;
-        }
+        const busRouteType = getBusRouteType(route_id)!;
         markers.push(
           <Point
             key={vehicle.vehicle.id}
             map={map}
             onClick={() => {
-              polylines.current?.forEach((polyline) => polyline.setMap(null));
+              if (!map) return;
+              selectedPolylines.forEach((polyline) => polyline.setMap(null));
+
               const trip_id = vehicle.trip.trip_id;
               const trip = tripMap.get(trip_id);
               if (!trip) return;
+
               const { shape_id } = trip;
               let shapes = shapeMap.get(shape_id);
               if (!shapes) return;
+
               const path = shapes.map((shape) => ({
                 lat: shape.shape_pt_lat,
                 lng: shape.shape_pt_lon,
               }));
+
               const bounds = new google.maps.LatLngBounds();
               path.forEach((point) => bounds.extend(point));
+
               const zIndex = zIndexGen(
                 parseInt(vehicle.vehicle.id),
                 ZIndexLayer.POLYLINE_SELECTED
               );
-              // outline
-              polylines.current[1] = new google.maps.Polyline({
+
+              const outline = new google.maps.Polyline({
                 path,
                 strokeColor: "#ffffff",
                 strokeWeight: 9,
                 zIndex: zIndex - 1,
               });
-              // fill
-              polylines.current[0] = new google.maps.Polyline({
+              const fill = new google.maps.Polyline({
                 path,
                 strokeColor,
                 strokeWeight: 6,
                 zIndex: zIndex,
               });
-              if (!map) return;
-              polylines.current?.forEach((polyline) => polyline.setMap(map));
+              setSelectedPolylines([outline, fill]);
               map.fitBounds(bounds);
             }}
             route={route}
             vehicle={vehicle}
             vehicleType={vehicleType}
-            visible={visible}
+            visible={getVisibility(route_type, busRouteType)}
           />
         );
       });
@@ -413,7 +357,8 @@ function Maps() {
     map,
     midnight,
     peakExpressExtended,
-    polylines,
+    routePolylines,
+    busRoutePolylines,
     rail,
     routeMap,
     schoolBus,
@@ -421,6 +366,8 @@ function Maps() {
     standard,
     tripMap,
     vehicleType,
+    selectedPolylines,
+    getVisibility,
   ]);
 
   return (
