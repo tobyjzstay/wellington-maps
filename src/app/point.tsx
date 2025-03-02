@@ -1,7 +1,7 @@
 import React from "react";
 import { Route } from "./api/routes/route";
 import { Vehicle } from "./api/vehiclepositions/route";
-import { ZIndexLayer, zIndexGen } from "./maps";
+import { MapContext, MarkersContext, ZIndexLayer, zIndexGen } from "./maps";
 import { RouteType, getRouteColor } from "./util";
 
 const MARKER_SCALE = 1;
@@ -23,20 +23,21 @@ const MARKER_PATH = "M 0 0 m -15 0 a 15 15 0 1 0 30 0 a 15 15 0 1 0 -30 0";
 const MARKER_TYPE_PATH = "M 0 0 m -8 0 a 8 8 0 1 0 16 0 a 8 8 0 1 0 -16 0";
 
 export function Point({
-  map,
   onClick,
   route,
   vehicle,
   vehicleType,
   visible,
 }: {
-  map: google.maps.Map | null;
   onClick: () => void;
   route: Route;
   vehicle: Vehicle;
   vehicleType: boolean;
   visible: boolean;
 }) {
+  const map = React.useContext(MapContext);
+  const markers = React.useContext(MarkersContext);
+
   const { id, route_id, route_short_name, route_long_name, route_type } = route;
   const { bearing, latitude, longitude } = vehicle.position;
   const vehicle_id = vehicle.vehicle.id;
@@ -99,9 +100,18 @@ export function Point({
           text: route_short_name,
         },
         title: route_long_name,
+        visible,
         zIndex, // prevent flickering
       }),
-    [color, fillColor, route_long_name, route_short_name, strokeColor, zIndex]
+    [
+      color,
+      fillColor,
+      route_long_name,
+      route_short_name,
+      strokeColor,
+      visible,
+      zIndex,
+    ]
   );
   marker.addListener("click", onClick);
 
@@ -117,9 +127,10 @@ export function Point({
           strokeColor: "#ffffff",
           strokeWeight: 1,
         },
+        visible: vehicleType && visible,
         zIndex: zIndex + 1,
       }),
-    [typeFillColor, zIndex]
+    [typeFillColor, vehicleType, visible, zIndex]
   );
 
   const typeIconMarker = React.useMemo(() => {
@@ -139,10 +150,11 @@ export function Point({
         strokeWeight: 0,
       },
       title: route_long_name,
+      visible: vehicleType && visible,
       zIndex: zIndex + 2,
     });
     return marker;
-  }, [route_long_name, typePath, zIndex]);
+  }, [route_long_name, typePath, vehicleType, visible, zIndex]);
   typeIconMarker.addListener("click", onClick);
 
   React.useEffect(() => {
@@ -152,29 +164,18 @@ export function Point({
   }, [latitude, longitude, marker, typeIconMarker, typeMarker]);
 
   React.useEffect(() => {
-    if (visible) {
-      marker.setMap(map);
-    } else {
-      marker.setMap(null);
-    }
-    return () => {
-      marker.setMap(null);
-    };
-  }, [map, marker, visible]);
+    markers.set(vehicle_id, [marker, typeMarker, typeIconMarker]);
+    marker.setMap(map);
+    typeMarker.setMap(map);
+    typeIconMarker.setMap(map);
 
-  React.useEffect(() => {
-    if (vehicleType && visible) {
-      typeMarker.setMap(map);
-      typeIconMarker.setMap(map);
-    } else {
-      typeMarker.setMap(null);
-      typeIconMarker.setMap(null);
-    }
     return () => {
+      marker.setMap(null);
       typeMarker.setMap(null);
       typeIconMarker.setMap(null);
+      markers.delete(vehicle_id);
     };
-  }, [map, typeIconMarker, typeMarker, vehicleType, visible]);
+  }, [map, marker, markers, typeIconMarker, typeMarker, vehicle_id]);
 
   return null;
 }

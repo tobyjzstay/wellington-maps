@@ -16,7 +16,11 @@ import simplify from "simplify-js";
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Trip } from "./api/trips/route";
-import { Entity, VehiclePositions } from "./api/vehiclepositions/route";
+import {
+  Entity,
+  Vehicle,
+  VehiclePositions,
+} from "./api/vehiclepositions/route";
 import styles from "./maps.module.css";
 import { Point } from "./point";
 import {
@@ -30,6 +34,7 @@ import {
 const CENTER = { lat: -41.2529601, lng: 174.7542577 };
 const UPDATE_INTERVAL = 5000;
 const Z_INDEX_BUFFER = 10000;
+const ZOOM = 12;
 
 export enum ZIndexLayer {
   POLYLINE,
@@ -38,32 +43,19 @@ export enum ZIndexLayer {
 }
 
 export const MapContext = React.createContext<google.maps.Map | null>(null);
+export const MarkersContext = React.createContext<
+  Map<String, google.maps.Marker[]>
+>(new Map());
 
 const routeIdValues = Object.values(RouteId);
 
 function Maps() {
-  const [routeMap, setRouteMap] = React.useState<Map<number, Route> | null>(
-    null
-  );
-  const [shapeMap, setShapeMap] = React.useState<Map<string, Shape[]> | null>(
-    null
-  );
-  const [tripMap, setTripMap] = React.useState<Map<string, Trip> | null>(null);
-  const [zoom, setZoom] = React.useState(12);
-  const fetchingData = React.useRef(false);
-
+  const mapRef = React.useRef<HTMLDivElement | null>(null);
+  const [map, setMap] = React.useState<google.maps.Map | null>(null);
+  const [zoom, setZoom] = React.useState(ZOOM);
   React.useEffect(() => {
-    if (fetchingData.current) return;
-    fetchingData.current = true;
-    getRouteMap().then(setRouteMap);
-    getShapeMap().then(setShapeMap);
-    getTripMap().then(setTripMap);
-  }, []);
-
-  const mapElement = document.getElementById("map");
-  const map = React.useMemo(() => {
-    if (!mapElement) return null;
-    const map = new google.maps.Map(mapElement, {
+    if (!mapRef.current || map) return;
+    const newMap = new google.maps.Map(mapRef.current, {
       center: CENTER,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       disableDefaultUI: true,
@@ -80,41 +72,115 @@ function Maps() {
           stylers: [{ visibility: "off" }],
         },
       ],
-      zoom,
+      zoom: ZOOM,
     });
 
-    map?.addListener("click", () => {
-      setSelectedPolylines([]);
+    newMap.addListener("zoom_changed", () => {
+      setZoom(newMap.getZoom()!);
     });
 
-    map.addListener("zoom_changed", () => {
-      setZoom(map.getZoom()!);
-    });
-
-    return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapElement]);
+    setMap(newMap);
+  }, [map]);
 
   const [selectedPolylines, setSelectedPolylines] = React.useState<
     google.maps.Polyline[]
   >([]);
 
   React.useEffect(() => {
-    if (routeMap === null || shapeMap === null || tripMap === null) return;
+    if (!map) return;
+    map.addListener("click", () => {
+      selectedPolylines.forEach((polyline) => polyline.setMap(null));
+      setSelectedPolylines([]);
+    });
+  }, [map, selectedPolylines]);
 
-    const drawnShapes: string[] = [];
-    const newRoutePolylines = new Map<RouteType, google.maps.Polyline[]>();
-    const newBusRoutePolylines = new Map<
-      BusRouteType,
-      google.maps.Polyline[]
-    >();
+  const [routeMap, setRouteMap] = React.useState<Map<number, Route> | null>(
+    null
+  );
+  const [shapesMap, setShapesMap] = React.useState<Map<string, Shape[]> | null>(
+    null
+  );
+  const [tripMap, setTripMap] = React.useState<Map<string, Trip> | null>(null);
+  React.useEffect(() => {
+    Promise.all([getRouteMap(), getShapeMap(), getTripMap()]).then(
+      ([routes, shapes, trips]) => {
+        setRouteMap(routes);
+        setShapesMap(shapes);
+        setTripMap(trips);
+      }
+    );
+  }, []);
 
-    Array.from(tripMap.values()).forEach((trip) => {
+  const vehicleMapRef = React.useRef<Map<String, Vehicle>>(new Map());
+
+  const [rail, setRail] = React.useState(true);
+  const [frequent, setFrequent] = React.useState(true);
+  const [standard, setStandard] = React.useState(true);
+  const [peakExpressExtended, setPeakExpressExtended] = React.useState(true);
+  const [midnight, setMidnight] = React.useState(false);
+  const [ferry, setFerry] = React.useState(true);
+  const [cableCar, setCableCar] = React.useState(true);
+  const [schoolBus, setSchoolBus] = React.useState(false);
+
+  const getVisibility = React.useCallback(
+    (routeType: RouteType, busRouteType?: BusRouteType | null) => {
+      const visibilityMap = {
+        [RouteType.RAIL]: rail,
+        [RouteType.FERRY]: ferry,
+        [RouteType.CABLE_CAR]: cableCar,
+        [RouteType.SCHOOL_BUS]: schoolBus,
+        [RouteType.BUS]: {
+          [BusRouteType.FREQUENT]: frequent,
+          [BusRouteType.STANDARD]: standard,
+          [BusRouteType.PEAK_EXPRESS_EXTENDED]: peakExpressExtended,
+          [BusRouteType.MIDNIGHT]: midnight,
+        },
+      };
+
+      return routeType === RouteType.BUS
+        ? visibilityMap[RouteType.BUS][busRouteType!] ?? false
+        : visibilityMap[routeType] ?? false;
+    },
+    [
+      rail,
+      ferry,
+      cableCar,
+      schoolBus,
+      frequent,
+      standard,
+      peakExpressExtended,
+      midnight,
+    ]
+  );
+  const [polylinesCounter, setPolylinesCounter] = React.useState(0);
+  const busRoutePolylinesRef = React.useRef<
+    Map<BusRouteType, google.maps.Polyline[]>
+  >(new Map());
+  const routePolylinesRef = React.useRef<
+    Map<RouteType, google.maps.Polyline[]>
+  >(new Map());
+
+  React.useEffect(() => {
+    if (!map || !routeMap || !shapesMap || !tripMap) return;
+    const drawnShapeIds: string[] = [];
+
+    [busRoutePolylinesRef, routePolylinesRef].forEach((polylinesRef) => {
+      polylinesRef.current.forEach((polylines) =>
+        polylines.forEach((polyline) => polyline.setMap(null))
+      );
+      polylinesRef.current.clear();
+    });
+
+    tripMap.forEach((trip) => {
       const { id, route_id: trip_route_id, shape_id } = trip;
+      if (drawnShapeIds.includes(shape_id)) return;
       const route = routeMap.get(trip_route_id);
-      if (!route || drawnShapes.includes(shape_id)) return;
+      if (!route) {
+        console.warn("Route not found:", trip_route_id);
+        return;
+      }
       const { route_id, route_type } = route;
-      const shapes = shapeMap.get(shape_id);
+      const shapes = shapesMap.get(shape_id);
       if (!shapes) return;
       const { strokeColor } = getRouteColor(route);
       let path = shapes.map((shape) => ({
@@ -133,9 +199,7 @@ function Maps() {
       const bounds = new google.maps.LatLngBounds();
       path.forEach((point) => bounds.extend(point));
       const onClick = () => {
-        if (!map) return;
         const zIndex = zIndexGen(id, ZIndexLayer.POLYLINE_SELECTED);
-        selectedPolylines.forEach((polyline) => polyline.setMap(null));
         const outline = new google.maps.Polyline({
           path,
           strokeColor: "#ffffff",
@@ -155,10 +219,16 @@ function Maps() {
         routeIdValues.indexOf(route_id),
         ZIndexLayer.POLYLINE
       );
+      const busRouteType = getBusRouteType(route_id);
+      if (route_type === RouteType.BUS && busRouteType === null) {
+        console.warn("Bus route type not found:", route_id);
+        return;
+      }
       const outline = new google.maps.Polyline({
         path,
         strokeColor: "#ffffff",
         strokeWeight: 3,
+        visible: getVisibility(route_type, busRouteType),
         zIndex: zIndex - 1,
       });
       outline.addListener("click", onClick);
@@ -166,106 +236,57 @@ function Maps() {
         path,
         strokeColor,
         strokeWeight: 2,
+        visible: getVisibility(route_type, busRouteType),
         zIndex: zIndex,
       });
       fill.addListener("click", onClick);
 
-      drawnShapes.push(shape_id);
+      drawnShapeIds.push(shape_id);
 
       if (route_type === RouteType.BUS) {
-        const busRouteType = getBusRouteType(route_id)!;
-        if (!newBusRoutePolylines.has(busRouteType))
-          newBusRoutePolylines.set(busRouteType, []);
-        newBusRoutePolylines.get(busRouteType)!.push(outline, fill);
+        if (!busRoutePolylinesRef.current.has(busRouteType!))
+          busRoutePolylinesRef.current.set(busRouteType!, []);
+        const busRoutePolylines = busRoutePolylinesRef.current.get(
+          busRouteType!
+        );
+        if (!busRoutePolylines) {
+          console.warn("Bus route polylines not found:", busRouteType);
+          return;
+        }
+        busRoutePolylines.push(outline, fill);
       } else {
-        if (!newRoutePolylines.has(route_type))
-          newRoutePolylines.set(route_type, []);
-        newRoutePolylines.get(route_type)!.push(outline, fill);
+        if (!routePolylinesRef.current.has(route_type))
+          routePolylinesRef.current.set(route_type, []);
+        const routePolylines = routePolylinesRef.current.get(route_type);
+        if (!routePolylines) {
+          console.warn("Route polylines not found:", route_type);
+          return;
+        }
+        routePolylines.push(outline, fill);
       }
     });
-    setBusRoutePolylines(newBusRoutePolylines);
-    setRoutePolylines(newRoutePolylines);
-    return () => {
-      newRoutePolylines.forEach((polylines) =>
-        polylines.forEach((polyline) => polyline.setMap(null))
-      );
-      newBusRoutePolylines.forEach((polylines) =>
-        polylines.forEach((polyline) => polyline.setMap(null))
-      );
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, routeMap, shapeMap, tripMap, zoom]);
-
-  const [markers, setMarkers] = React.useState<JSX.Element[]>([]);
-
-  const [routePolylines, setRoutePolylines] = React.useState<
-    Map<RouteType, google.maps.Polyline[]>
-  >(new Map());
-  const [busRoutePolylines, setBusRoutePolylines] = React.useState<
-    Map<BusRouteType, google.maps.Polyline[]>
-  >(new Map());
-
-  const [rail, setRail] = React.useState(true);
-  const [frequent, setFrequent] = React.useState(true);
-  const [standard, setStandard] = React.useState(true);
-  const [peakExpressExtended, setPeakExpressExtended] = React.useState(true);
-  const [midnight, setMidnight] = React.useState(false);
-  const [ferry, setFerry] = React.useState(true);
-  const [cableCar, setCableCar] = React.useState(true);
-  const [schoolBus, setSchoolBus] = React.useState(false);
-
-  const getVisibility = React.useCallback(
-    (routeType: RouteType, busRouteType?: BusRouteType) => {
-      switch (routeType) {
-        case RouteType.RAIL:
-          return rail;
-        case RouteType.BUS:
-          switch (busRouteType) {
-            case BusRouteType.FREQUENT:
-              return frequent;
-            case BusRouteType.STANDARD:
-              return standard;
-            case BusRouteType.PEAK_EXPRESS_EXTENDED:
-              return peakExpressExtended;
-            case BusRouteType.MIDNIGHT:
-              return midnight;
-            default:
-              return false;
-          }
-        case RouteType.FERRY:
-          return ferry;
-        case RouteType.CABLE_CAR:
-          return cableCar;
-        case RouteType.SCHOOL_BUS:
-          return schoolBus;
-        case RouteType.BUS:
-        default:
-          return false;
-      }
-    },
-    [
-      rail,
-      frequent,
-      standard,
-      peakExpressExtended,
-      midnight,
-      ferry,
-      cableCar,
-      schoolBus,
-    ]
-  );
+    setPolylinesCounter((prev) => prev + 1);
+  }, [
+    getVisibility,
+    map,
+    routeMap,
+    // selectedPolylines,
+    shapesMap,
+    tripMap,
+    zoom,
+  ]);
 
   React.useEffect(() => {
     if (!map) return;
-    routePolylines.forEach((polylines, routeType) => {
+    routePolylinesRef.current.forEach((polylines, routeType) => {
       const isVisible = getVisibility(routeType);
       polylines.forEach((polyline) => polyline.setMap(isVisible ? map : null));
     });
-    busRoutePolylines.forEach((polylines, routeType) => {
+    busRoutePolylinesRef.current.forEach((polylines, routeType) => {
       const isVisible = getVisibility(RouteType.BUS, routeType);
       polylines.forEach((polyline) => polyline.setMap(isVisible ? map : null));
     });
-  }, [map, routePolylines, busRoutePolylines, getVisibility]);
+  }, [getVisibility, map, polylinesCounter]);
 
   React.useEffect(() => {
     if (!map) return;
@@ -275,25 +296,53 @@ function Maps() {
     };
   }, [selectedPolylines, map]);
 
+  const markers = React.useContext(MarkersContext);
+  const [markerElements, setMarkerElements] = React.useState<
+    Map<String, JSX.Element>
+  >(new Map());
   const [vehicleType, setVehicleType] = React.useState(false);
   React.useEffect(() => {
+    if (!routeMap || !shapesMap || !tripMap) return;
+    let interval: NodeJS.Timeout;
+    (async () => {
+      update();
+      interval = setInterval(update, UPDATE_INTERVAL);
+    })();
+    return () => clearInterval(interval);
+
     async function update() {
-      if (routeMap === null || shapeMap === null || tripMap === null) return;
+      if (!routeMap || !shapesMap || !tripMap) return;
       const response = await fetch("/api/vehiclepositions");
       const vehiclepositions: VehiclePositions = await response.json();
+      vehicleMapRef.current = new Map(
+        vehiclepositions.entity.map((entity) => [
+          entity.vehicle.vehicle.id,
+          entity.vehicle,
+        ])
+      );
       const { entity } = vehiclepositions;
-      const markers: JSX.Element[] = [];
+      const newMarkerElements: Map<String, JSX.Element> = new Map();
       entity.forEach((entity: Entity) => {
         const { vehicle } = entity;
+        const vehicleMarkers = markers.get(vehicle.vehicle.id);
+        if (vehicleMarkers) {
+          vehicleMarkers.forEach((marker) => {
+            marker.setPosition({
+              lat: vehicle.position.latitude,
+              lng: vehicle.position.longitude,
+            });
+          });
+          return;
+        }
         const route = routeMap.get(vehicle.trip.route_id);
         if (!route) return null;
         const { strokeColor } = getRouteColor(route);
         const { route_id, route_type } = route;
         const busRouteType = getBusRouteType(route_id)!;
-        markers.push(
+        newMarkerElements.set(
+          vehicle.vehicle.id,
           <Point
             key={vehicle.vehicle.id}
-            map={map}
             onClick={() => {
               if (!map) return;
               selectedPolylines.forEach((polyline) => polyline.setMap(null));
@@ -303,7 +352,7 @@ function Maps() {
               if (!trip) return;
 
               const { shape_id } = trip;
-              let shapes = shapeMap.get(shape_id);
+              let shapes = shapesMap.get(shape_id);
               if (!shapes) return;
 
               const path = shapes.map((shape) => ({
@@ -341,34 +390,44 @@ function Maps() {
           />
         );
       });
-      setMarkers(markers);
+      setMarkerElements((prevMarkerElements) => {
+        const updatedMarkers = new Map(prevMarkerElements);
+        newMarkerElements.forEach((value, key) => {
+          updatedMarkers.set(key, value);
+        });
+        return updatedMarkers;
+      });
     }
-
-    let interval: NodeJS.Timeout;
-    (async () => {
-      update();
-      interval = setInterval(update, UPDATE_INTERVAL);
-    })();
-    return () => clearInterval(interval);
   }, [
-    cableCar,
-    ferry,
-    frequent,
     map,
-    midnight,
-    peakExpressExtended,
-    routePolylines,
-    busRoutePolylines,
-    rail,
     routeMap,
-    schoolBus,
-    shapeMap,
-    standard,
+    shapesMap,
     tripMap,
     vehicleType,
-    selectedPolylines,
+    // selectedPolylines,
     getVisibility,
+    markers,
   ]);
+
+  React.useEffect(() => {
+    if (!routeMap || !vehicleMapRef.current) return;
+    markers.forEach((vehicleMarkers, vehicleId) => {
+      vehicleMarkers.forEach((marker, index) => {
+        const vehicle = vehicleMapRef.current.get(vehicleId);
+        if (!vehicle) return;
+        const { trip } = vehicle;
+        const { route_id: trip_route_id } = trip;
+        const route = routeMap.get(trip_route_id);
+        if (!route) return;
+        const { route_id, route_type } = route;
+        const busRouteType = getBusRouteType(route_id)!;
+        marker.setVisible(
+          (getVisibility(route_type, busRouteType) && index === 0) ||
+            vehicleType
+        );
+      });
+    });
+  }, [getVisibility, markers, routeMap, vehicleType]);
 
   return (
     <div className={styles["maps-container"]}>
@@ -521,8 +580,12 @@ function Maps() {
           />
         </FormGroup>
       </Drawer>
-      <div id="map" className={styles["maps-map"]} />
-      {markers}
+      <MapContext.Provider value={map}>
+        <MarkersContext.Provider value={markers}>
+          <div ref={mapRef} className={styles["maps-map"]} />
+          {Array.from(markerElements.values())}
+        </MarkersContext.Provider>
+      </MapContext.Provider>
     </div>
   );
 }
