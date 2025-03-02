@@ -35,6 +35,7 @@ const CENTER = { lat: -41.2529601, lng: 174.7542577 };
 const UPDATE_INTERVAL = 5000;
 const Z_INDEX_BUFFER = 10000;
 const ZOOM = 12;
+const ZOOM_DEBOUNCE = 1000;
 
 export enum ZIndexLayer {
   POLYLINE,
@@ -53,6 +54,7 @@ function Maps() {
   const mapRef = React.useRef<HTMLDivElement | null>(null);
   const [map, setMap] = React.useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = React.useState(ZOOM);
+  const zoomTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   React.useEffect(() => {
     if (!mapRef.current || map) return;
     const newMap = new google.maps.Map(mapRef.current, {
@@ -76,7 +78,10 @@ function Maps() {
     });
 
     newMap.addListener("zoom_changed", () => {
-      setZoom(newMap.getZoom()!);
+      if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
+      zoomTimeoutRef.current = setTimeout(() => {
+        setZoom(newMap.getZoom()!);
+      }, ZOOM_DEBOUNCE);
     });
 
     setMap(newMap);
@@ -345,7 +350,6 @@ function Maps() {
             key={vehicle.vehicle.id}
             onClick={() => {
               if (!map) return;
-              selectedPolylines.forEach((polyline) => polyline.setMap(null));
 
               const trip_id = vehicle.trip.trip_id;
               const trip = tripMap.get(trip_id);
@@ -398,16 +402,7 @@ function Maps() {
         return updatedMarkers;
       });
     }
-  }, [
-    map,
-    routeMap,
-    shapesMap,
-    tripMap,
-    vehicleType,
-    // selectedPolylines,
-    getVisibility,
-    markers,
-  ]);
+  }, [map, routeMap, shapesMap, tripMap, vehicleType, getVisibility, markers]);
 
   React.useEffect(() => {
     if (!routeMap || !vehicleMapRef.current) return;
