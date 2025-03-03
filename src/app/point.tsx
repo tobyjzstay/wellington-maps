@@ -5,6 +5,7 @@ import { MapContext, MarkersContext, ZIndexLayer, zIndexGen } from "./maps";
 import { RouteType, getRouteColor } from "./util";
 
 const MARKER_SCALE = 1;
+const MARKER_BEARING_SCALE = 1;
 const MARKER_TYPE_SCALE = 1;
 const ICON_TYPE_SCALE = 5;
 
@@ -20,6 +21,7 @@ const SCHOOL_BUS_TYPE_PATH =
   "M29.086 15c.883 0 3.721.339 4.368 2.112.648 1.775 2.507 8.79 2.591 16.728.011 1.032.036 2.075.058 3.11l1.764-1.322c.677-.501.895-.583 1.681-.583h1.125c.21 0 .491.04.793.134a1.7 1.7 0 0 1-.96-1.533c0-.945.762-1.705 1.707-1.705a1.7 1.7 0 0 1 1.704 1.705 1.7 1.7 0 0 1-2.137 1.65c.196.084.393.192.58.328l3.642 2.708c.99.736.085 2.03-.84 1.392l-2.382-1.649s-1.576 3.52-.985 5.161c.018.058.034.109.032.148l1.532 4.25a.772.772 0 0 1 .71-.42h2.805c.561 0 .561-1.17.561-1.757 0-2.34 1.119-4.685 2.243-4.685l.715.001a1.702 1.702 0 0 1-.791-1.443c0-.946.762-1.704 1.705-1.704.944 0 1.706.758 1.706 1.704 0 .719-.44 1.33-1.064 1.582.207.108.365.272.531.444l2.382 2.49c.307.319.426.607.426 1.028 0 .581-.861.862-1.334.361l-2.033-2.12c-1.123 0-1.543 2.929-1.123 4.099l1.682 4.685c.462 1.297-1.282 1.695-1.68.585l-1.683-4.681s-.56 1.17-1.681 1.17H44.07c-.093 0-.168-.027-.246-.05l.457 1.268c.28.786-.262 1.255-.81 1.244-.357-.003-.699-.223-.874-.659l-3.049-7.539s-.558 3.514-2.803 3.515H35.43c-.608 1.935-1.703 3.263-3.646 3.574v2.43c0 1.239-.502 2.244-1.125 2.244h-2.306c-.62 0-1.125-1.005-1.125-2.244V50.4H9.623v2.355C9.623 53.995 9.12 55 8.5 55H6.193c-.62 0-1.123-1.005-1.123-2.244v-2.373l.002-.057C-.134 49.496.736 41.366.813 33.84c.082-7.937 1.943-14.953 2.589-16.728C4.05 15.337 6.886 15 7.769 15Zm1.025 29.21c-.928 0-1.678.786-1.678 1.754 0 .97.75 1.755 1.678 1.755.923 0 1.674-.788 1.674-1.755 0-.968-.749-1.755-1.674-1.755Zm-23.365 0c-.926 0-1.676.786-1.676 1.754 0 .97.75 1.755 1.676 1.755.926 0 1.677-.788 1.677-1.755 0-.968-.751-1.755-1.677-1.755Zm31.683-6.824-2.292 1.595c.023 2.179-.025 4.247-.311 6.015h.358c1.112 0 1.128-1.611 1.124-2.683v-.246c0-1.752 1.121-4.681 1.121-4.681ZM14.446 18.073l-.085.003c-3.101.092-7.045.441-8.283 1.581-1.242 1.147-1.918 1.919-2.708 11.01a47.295 47.295 0 0 0-.1 1.517h.034c0 2.31 6.764 4.182 15.124 4.195 8.36-.013 15.125-1.888 15.125-4.195h.031a32.362 32.362 0 0 0-.107-1.516c-.781-9.092-1.457-9.864-2.704-11.01-1.122-1.036-4.476-1.42-7.405-1.55.054.228.084.485.084.758 0 .937-.354 1.705-.79 1.705h-7.523c-.433 0-.783-.768-.783-1.705 0-.286.032-.556.09-.793Z";
 
 const MARKER_PATH = "M 0 0 m -15 0 a 15 15 0 1 0 30 0 a 15 15 0 1 0 -30 0";
+const MARKER_BEARING_PATH = "M -0 -4 L -8 4 L -10 2 L -0 -8 L 10 2 L 8 4";
 const MARKER_TYPE_PATH = "M 0 0 m -8 0 a 8 8 0 1 0 16 0 a 8 8 0 1 0 -16 0";
 
 export function Point({
@@ -75,7 +77,7 @@ export function Point({
         typeFillColor,
       };
     }, [route, route_type]);
-
+  strokeColor;
   const zIndex = React.useMemo(
     () => zIndexGen(parseInt(vehicle_id), ZIndexLayer.MARKER) * 3,
     [vehicle_id]
@@ -114,6 +116,26 @@ export function Point({
     ]
   );
   marker.addListener("click", onClick);
+
+  const bearingMarker = React.useMemo(
+    () =>
+      new google.maps.Marker({
+        icon: {
+          anchor: new google.maps.Point(0, 20),
+          fillColor: strokeColor,
+          fillOpacity: 1,
+          path: MARKER_BEARING_PATH,
+          rotation: bearing,
+          scale: MARKER_BEARING_SCALE,
+          strokeColor: strokeColor,
+          strokeWeight: 1,
+        },
+        visible,
+        zIndex: zIndex + 1,
+      }),
+    [bearing, strokeColor, visible, zIndex]
+  );
+  bearingMarker.addListener("click", onClick);
 
   const typeMarker = React.useMemo(
     () =>
@@ -159,23 +181,39 @@ export function Point({
 
   React.useEffect(() => {
     marker.setPosition({ lat: latitude, lng: longitude });
+    bearingMarker.setPosition({ lat: latitude, lng: longitude });
     typeMarker.setPosition({ lat: latitude, lng: longitude });
     typeIconMarker.setPosition({ lat: latitude, lng: longitude });
-  }, [latitude, longitude, marker, typeIconMarker, typeMarker]);
+  }, [bearingMarker, latitude, longitude, marker, typeIconMarker, typeMarker]);
 
   React.useEffect(() => {
-    markers.set(vehicle_id, [marker, typeMarker, typeIconMarker]);
+    markers.set(vehicle_id, [
+      marker,
+      bearingMarker,
+      typeMarker,
+      typeIconMarker,
+    ]);
     marker.setMap(map);
+    bearingMarker.setMap(map);
     typeMarker.setMap(map);
     typeIconMarker.setMap(map);
 
     return () => {
       marker.setMap(null);
+      bearingMarker.setMap(null);
       typeMarker.setMap(null);
       typeIconMarker.setMap(null);
       markers.delete(vehicle_id);
     };
-  }, [map, marker, markers, typeIconMarker, typeMarker, vehicle_id]);
+  }, [
+    bearingMarker,
+    map,
+    marker,
+    markers,
+    typeIconMarker,
+    typeMarker,
+    vehicle_id,
+  ]);
 
   return null;
 }
