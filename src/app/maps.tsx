@@ -32,6 +32,7 @@ import {
 } from "./util";
 
 const CENTER = { lat: -41.2529601, lng: 174.7542577 };
+const MARKER_ANIMATION_DURATION = 1000;
 const UPDATE_INTERVAL = 5000;
 const Z_INDEX_BUFFER = 10000;
 const ZOOM = 12;
@@ -281,15 +282,7 @@ function Maps() {
       }
     });
     setPolylinesCounter((prev) => prev + 1);
-  }, [
-    getVisibility,
-    map,
-    routeMap,
-    // selectedPolylines,
-    shapesMap,
-    tripMap,
-    zoom,
-  ]);
+  }, [getVisibility, map, routeMap, shapesMap, tripMap, zoom]);
 
   React.useEffect(() => {
     if (!map) return;
@@ -342,10 +335,13 @@ function Maps() {
         const vehicleMarkers = markers.get(vehicle.vehicle.id);
         if (vehicleMarkers) {
           vehicleMarkers.forEach((marker) => {
-            marker.setPosition({
-              lat: vehicle.position.latitude,
-              lng: vehicle.position.longitude,
-            });
+            animateMarker(
+              marker,
+              new google.maps.LatLng(
+                vehicle.position.latitude,
+                vehicle.position.longitude
+              )
+            );
           });
           return;
         }
@@ -433,6 +429,40 @@ function Maps() {
       });
     });
   }, [getVisibility, markers, routeMap, vehicleType]);
+
+  function animateMarker(
+    marker: google.maps.Marker,
+    endPosition: google.maps.LatLng
+  ) {
+    const startPosition = marker.getPosition();
+    if (!startPosition) return;
+
+    const startLat = startPosition.lat();
+    const startLng = startPosition.lng();
+    const endLat = endPosition.lat();
+    const endLng = endPosition.lng();
+
+    const startTime = performance.now();
+
+    function easeInOutQuad(t: number) {
+      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+    }
+
+    function animateStep(timestamp: number) {
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / MARKER_ANIMATION_DURATION, 1);
+      const easedProgress = easeInOutQuad(progress);
+
+      const lat = startLat + (endLat - startLat) * easedProgress;
+      const lng = startLng + (endLng - startLng) * easedProgress;
+
+      marker.setPosition(new google.maps.LatLng(lat, lng));
+
+      if (progress < 1) requestAnimationFrame(animateStep);
+    }
+
+    requestAnimationFrame(animateStep);
+  }
 
   return (
     <div className={styles["maps-container"]}>
