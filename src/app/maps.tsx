@@ -77,15 +77,22 @@ function Maps() {
       zoom: ZOOM,
     });
 
-    newMap.addListener("zoom_changed", () => {
-      if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
-      zoomTimeoutRef.current = setTimeout(() => {
-        setZoom(newMap.getZoom()!);
-      }, ZOOM_DEBOUNCE);
-    });
-
     setMap(newMap);
   }, [map]);
+
+  const updateZoom = React.useCallback(() => {
+    if (map) setZoom(map.getZoom()!);
+  }, [map]);
+
+  React.useEffect(() => {
+    if (!map) return;
+    map.addListener("zoom_changed", () => {
+      if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
+      zoomTimeoutRef.current = setTimeout(() => {
+        updateZoom();
+      }, ZOOM_DEBOUNCE);
+    });
+  }, [map, updateZoom]);
 
   const [selectedPolylines, setSelectedPolylines] = React.useState<
     google.maps.Polyline[]
@@ -194,15 +201,18 @@ function Maps() {
       }));
 
       const tolerance = 0.0001 * Math.pow(2, 12 - zoom);
-      const simplifiedPath = simplify(
+      const simplifiedPoints = simplify(
         path.map((point) => ({ x: point.lng, y: point.lat })),
         tolerance,
         true
       );
-      path = simplifiedPath.map((point) => ({ lat: point.y, lng: point.x }));
+      const simplifiedPath = simplifiedPoints.map((point) => ({
+        lat: point.y,
+        lng: point.x,
+      }));
 
       const bounds = new google.maps.LatLngBounds();
-      path.forEach((point) => bounds.extend(point));
+      simplifiedPath.forEach((point) => bounds.extend(point));
       const onClick = () => {
         const zIndex = zIndexGen(id, ZIndexLayer.POLYLINE_SELECTED);
         const outline = new google.maps.Polyline({
@@ -230,7 +240,7 @@ function Maps() {
         return;
       }
       const outline = new google.maps.Polyline({
-        path,
+        path: simplifiedPath,
         strokeColor: "#ffffff",
         strokeWeight: 3,
         visible: getVisibility(route_type, busRouteType),
@@ -238,7 +248,7 @@ function Maps() {
       });
       outline.addListener("click", onClick);
       const fill = new google.maps.Polyline({
-        path,
+        path: simplifiedPath,
         strokeColor,
         strokeWeight: 2,
         visible: getVisibility(route_type, busRouteType),
