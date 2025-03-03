@@ -45,7 +45,7 @@ export enum ZIndexLayer {
 }
 
 export const MapContext = React.createContext<google.maps.Map | null>(null);
-export const MarkersContext = React.createContext<
+export const MarkersMapContext = React.createContext<
   Map<String, google.maps.Marker[]>
 >(new Map());
 
@@ -304,7 +304,7 @@ function Maps() {
     };
   }, [selectedPolylines, map]);
 
-  const markers = React.useContext(MarkersContext);
+  const markersMap = React.useContext(MarkersMapContext);
   const [markerElements, setMarkerElements] = React.useState<
     Map<String, JSX.Element>
   >(new Map());
@@ -332,16 +332,27 @@ function Maps() {
       const newMarkerElements: Map<String, JSX.Element> = new Map();
       entity.forEach((entity: Entity) => {
         const { vehicle } = entity;
-        const vehicleMarkers = markers.get(vehicle.vehicle.id);
+        const vehicleMarkers = markersMap.get(vehicle.vehicle.id);
         if (vehicleMarkers) {
-          vehicleMarkers.forEach((marker) => {
-            animateMarker(
-              marker,
-              new google.maps.LatLng(
-                vehicle.position.latitude,
-                vehicle.position.longitude
-              )
-            );
+          vehicleMarkers.forEach((marker, i) => {
+            if (i === 1) {
+              animateMarker(
+                marker,
+                new google.maps.LatLng(
+                  vehicle.position.latitude,
+                  vehicle.position.longitude
+                ),
+                vehicle.position.bearing
+              );
+            } else {
+              animateMarker(
+                marker,
+                new google.maps.LatLng(
+                  vehicle.position.latitude,
+                  vehicle.position.longitude
+                )
+              );
+            }
           });
           return;
         }
@@ -407,12 +418,28 @@ function Maps() {
         });
         return updatedMarkers;
       });
+      markersMap.forEach((vehicleMarkers, vehicleId) => {
+        if (!vehicleMapRef.current.has(vehicleId)) {
+          vehicleMarkers.forEach((marker) => marker.setMap(null));
+          markersMap.delete(vehicleId);
+        } else {
+          vehicleMarkers.forEach((marker) => marker.setMap(map));
+        }
+      });
     }
-  }, [map, routeMap, shapesMap, tripMap, vehicleType, getVisibility, markers]);
+  }, [
+    map,
+    routeMap,
+    shapesMap,
+    tripMap,
+    vehicleType,
+    getVisibility,
+    markersMap,
+  ]);
 
   React.useEffect(() => {
     if (!routeMap || !vehicleMapRef.current) return;
-    markers.forEach((vehicleMarkers, vehicleId) => {
+    markersMap.forEach((vehicleMarkers, vehicleId) => {
       vehicleMarkers.forEach((marker, index) => {
         const vehicle = vehicleMapRef.current.get(vehicleId);
         if (!vehicle) return;
@@ -423,24 +450,22 @@ function Maps() {
         const { route_id, route_type } = route;
         const busRouteType = getBusRouteType(route_id)!;
         marker.setVisible(
-          (getVisibility(route_type, busRouteType) && index === 0) ||
-            vehicleType
+          vehicleType || (index <= 1 && getVisibility(route_type, busRouteType))
         );
       });
     });
-  }, [getVisibility, markers, routeMap, vehicleType]);
+  }, [getVisibility, markersMap, routeMap, vehicleType]);
 
   function animateMarker(
     marker: google.maps.Marker,
-    endPosition: google.maps.LatLng
+    endPosition: google.maps.LatLng,
+    bearing?: number
   ) {
     const startPosition = marker.getPosition();
     if (!startPosition) return;
 
     const startLat = startPosition.lat();
     const startLng = startPosition.lng();
-    const endLat = endPosition.lat();
-    const endLng = endPosition.lng();
 
     const startTime = performance.now();
 
@@ -453,10 +478,20 @@ function Maps() {
       const progress = Math.min(elapsed / MARKER_ANIMATION_DURATION, 1);
       const easedProgress = easeInOutQuad(progress);
 
-      const lat = startLat + (endLat - startLat) * easedProgress;
-      const lng = startLng + (endLng - startLng) * easedProgress;
+      const lat = startLat + (endPosition.lat() - startLat) * easedProgress;
+      const lng = startLng + (endPosition.lng() - startLng) * easedProgress;
 
       marker.setPosition(new google.maps.LatLng(lat, lng));
+
+      if (bearing) {
+        const icon = marker.getIcon() as google.maps.Icon;
+        marker.setIcon({
+          ...icon,
+          fillOpacity: 1,
+          rotation: bearing,
+          strokeWeight: 1,
+        });
+      }
 
       if (progress < 1) requestAnimationFrame(animateStep);
     }
@@ -616,10 +651,10 @@ function Maps() {
         </FormGroup>
       </Drawer>
       <MapContext.Provider value={map}>
-        <MarkersContext.Provider value={markers}>
+        <MarkersMapContext.Provider value={markersMap}>
           <div ref={mapRef} className={styles["maps-map"]} />
           {Array.from(markerElements.values())}
-        </MarkersContext.Provider>
+        </MarkersMapContext.Provider>
       </MapContext.Provider>
     </div>
   );
