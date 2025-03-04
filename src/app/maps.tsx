@@ -11,6 +11,7 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
+import { GoogleMap } from "@react-google-maps/api";
 import React from "react";
 import simplify from "simplify-js";
 import { Route } from "./api/routes/route";
@@ -51,13 +52,12 @@ export const MarkersMapContext = React.createContext<
 const routeIdValues = Object.values(RouteId);
 
 function Maps() {
-  const mapRef = React.useRef<HTMLDivElement | null>(null);
   const [map, setMap] = React.useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = React.useState(ZOOM);
   const zoomTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  React.useEffect(() => {
-    if (!mapRef.current || map) return;
-    const newMap = new google.maps.Map(mapRef.current, {
+
+  const onMapLoad = (map: google.maps.Map) => {
+    map.setOptions({
       center: CENTER,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       disableDefaultUI: true,
@@ -76,9 +76,8 @@ function Maps() {
       ],
       zoom: ZOOM,
     });
-
-    setMap(newMap);
-  }, [map]);
+    setMap(map);
+  };
 
   const updateZoom = React.useCallback(() => {
     if (map) setZoom(map.getZoom()!);
@@ -544,163 +543,167 @@ function Maps() {
   }
 
   return (
-    <div className={styles["maps-container"]}>
-      <Drawer
-        anchor="left"
-        className={styles["maps-drawer"]}
-        variant="permanent"
-      >
-        <Toolbar>
-          <Typography variant="h6" noWrap>
-            Wellington Maps
-          </Typography>
-        </Toolbar>
-        <Divider />
-        <FormGroup className={styles["maps-drawer-options"]}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={rail}
-                onChange={() => setRail(!rail)}
-                size="small"
-              />
-            }
-            label="Rail"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={
-                  frequent &&
-                  standard &&
-                  peakExpressExtended &&
-                  midnight &&
-                  schoolBus
-                }
-                indeterminate={
-                  (frequent ||
-                    standard ||
-                    peakExpressExtended ||
-                    midnight ||
-                    schoolBus) &&
-                  !(
+    <GoogleMap onLoad={onMapLoad}>
+      <div className={styles["maps-container"]}>
+        <Drawer
+          anchor="left"
+          className={styles["maps-drawer"]}
+          variant="permanent"
+        >
+          <Toolbar>
+            <Typography variant="h6" noWrap>
+              Wellington Maps
+            </Typography>
+          </Toolbar>
+          <Divider />
+          <FormGroup className={styles["maps-drawer-options"]}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={rail}
+                  onChange={() => setRail(!rail)}
+                  size="small"
+                />
+              }
+              label="Rail"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={
                     frequent &&
                     standard &&
                     peakExpressExtended &&
                     midnight &&
                     schoolBus
-                  )
+                  }
+                  indeterminate={
+                    (frequent ||
+                      standard ||
+                      peakExpressExtended ||
+                      midnight ||
+                      schoolBus) &&
+                    !(
+                      frequent &&
+                      standard &&
+                      peakExpressExtended &&
+                      midnight &&
+                      schoolBus
+                    )
+                  }
+                  onChange={() => {
+                    const state =
+                      frequent ||
+                      standard ||
+                      peakExpressExtended ||
+                      midnight ||
+                      schoolBus;
+                    setFrequent(!state);
+                    setStandard(!state);
+                    setPeakExpressExtended(!state);
+                    setMidnight(!state);
+                    setSchoolBus(!state);
+                  }}
+                  size="small"
+                />
+              }
+              label="Bus"
+            />
+            <Box className={styles["maps-drawer-options-bus"]}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={frequent}
+                    onChange={() => setFrequent(!frequent)}
+                    size="small"
+                  />
                 }
-                onChange={() => {
-                  const state =
-                    frequent ||
-                    standard ||
-                    peakExpressExtended ||
-                    midnight ||
-                    schoolBus;
-                  setFrequent(!state);
-                  setStandard(!state);
-                  setPeakExpressExtended(!state);
-                  setMidnight(!state);
-                  setSchoolBus(!state);
-                }}
-                size="small"
+                label="Frequent"
               />
-            }
-            label="Bus"
-          />
-          <Box className={styles["maps-drawer-options-bus"]}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={frequent}
-                  onChange={() => setFrequent(!frequent)}
-                  size="small"
-                />
-              }
-              label="Frequent"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={standard}
-                  onChange={() => setStandard(!standard)}
-                  size="small"
-                />
-              }
-              label="Standard"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={peakExpressExtended}
-                  onChange={() => setPeakExpressExtended(!peakExpressExtended)}
-                  size="small"
-                />
-              }
-              label="Peak, Express, Extended"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={midnight}
-                  onChange={() => setMidnight(!midnight)}
-                  size="small"
-                />
-              }
-              label="Midnight"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={schoolBus}
-                  onChange={() => setSchoolBus(!schoolBus)}
-                  size="small"
-                />
-              }
-              label="School"
-            />
-          </Box>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={ferry}
-                onChange={() => setFerry(!ferry)}
-                size="small"
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={standard}
+                    onChange={() => setStandard(!standard)}
+                    size="small"
+                  />
+                }
+                label="Standard"
               />
-            }
-            label="Ferry"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cableCar}
-                onChange={() => setCableCar(!cableCar)}
-                size="small"
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={peakExpressExtended}
+                    onChange={() =>
+                      setPeakExpressExtended(!peakExpressExtended)
+                    }
+                    size="small"
+                  />
+                }
+                label="Peak, Express, Extended"
               />
-            }
-            label="Cable Car"
-          />
-          <FormControlLabel
-            className={styles["maps-drawer-options-other"]}
-            control={
-              <Checkbox
-                checked={vehicleType}
-                onChange={() => setVehicleType(!vehicleType)}
-                size="small"
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={midnight}
+                    onChange={() => setMidnight(!midnight)}
+                    size="small"
+                  />
+                }
+                label="Midnight"
               />
-            }
-            label="Vehicle Type"
-          />
-        </FormGroup>
-      </Drawer>
-      <MapContext.Provider value={map}>
-        <MarkersMapContext.Provider value={markersMap}>
-          <div ref={mapRef} className={styles["maps-map"]} />
-          {Array.from(markerElements.values())}
-        </MarkersMapContext.Provider>
-      </MapContext.Provider>
-    </div>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={schoolBus}
+                    onChange={() => setSchoolBus(!schoolBus)}
+                    size="small"
+                  />
+                }
+                label="School"
+              />
+            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={ferry}
+                  onChange={() => setFerry(!ferry)}
+                  size="small"
+                />
+              }
+              label="Ferry"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={cableCar}
+                  onChange={() => setCableCar(!cableCar)}
+                  size="small"
+                />
+              }
+              label="Cable Car"
+            />
+            <FormControlLabel
+              className={styles["maps-drawer-options-other"]}
+              control={
+                <Checkbox
+                  checked={vehicleType}
+                  onChange={() => setVehicleType(!vehicleType)}
+                  size="small"
+                />
+              }
+              label="Vehicle Type"
+            />
+          </FormGroup>
+        </Drawer>
+        <MapContext.Provider value={map}>
+          <MarkersMapContext.Provider value={markersMap}>
+            <div className={styles["maps-map"]} />
+            {Array.from(markerElements.values())}
+          </MarkersMapContext.Provider>
+        </MapContext.Provider>
+      </div>
+    </GoogleMap>
   );
 }
 
