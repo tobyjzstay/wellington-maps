@@ -33,6 +33,7 @@ import {
 
 const CENTER = { lat: -41.2529601, lng: 174.7542577 };
 const MARKER_ANIMATION_DURATION = 1000;
+const MIN_PIXEL_MOVEMENT = 5;
 const UPDATE_INTERVAL = 5000;
 const Z_INDEX_BUFFER = 10000;
 const ZOOM = 12;
@@ -324,6 +325,12 @@ function Maps() {
       const bounds = map.getBounds();
       if (!bounds) return;
 
+      const projection = map.getProjection();
+      if (!projection) return;
+
+      const zoom = map.getZoom();
+      if (!zoom) return;
+
       const response = await fetch("/api/vehiclepositions");
       const vehiclepositions: VehiclePositions = await response.json();
       vehicleMapRef.current = new Map(
@@ -359,7 +366,23 @@ function Maps() {
               new google.maps.LatLng(maxLat, maxLng)
             );
 
-            if (bounds.intersects(movementBounds))
+            if (!bounds.intersects(movementBounds)) {
+              vehicleMarkers.forEach((marker) => marker.setPosition(endLatLng));
+              return;
+            }
+
+            const startPoint = projection.fromLatLngToPoint(startLatLng);
+            const endPoint = projection.fromLatLngToPoint(endLatLng);
+
+            if (!startPoint || !endPoint) return;
+
+            const deltaX =
+              Math.abs(endPoint.x - startPoint.x) * Math.pow(2, zoom);
+            const deltaY =
+              Math.abs(endPoint.y - startPoint.y) * Math.pow(2, zoom);
+            const movementDistance = Math.sqrt(deltaX ** 2 + deltaY ** 2);
+
+            if (movementDistance >= MIN_PIXEL_MOVEMENT)
               vehicleMarkers.forEach((marker, i) => {
                 animateMarker(
                   marker,
