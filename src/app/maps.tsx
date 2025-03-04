@@ -319,7 +319,11 @@ function Maps() {
     return () => clearInterval(interval);
 
     async function update() {
-      if (!routeMap || !shapesMap || !tripMap) return;
+      if (!map || !routeMap || !shapesMap || !tripMap) return;
+
+      const bounds = map.getBounds();
+      if (!bounds) return;
+
       const response = await fetch("/api/vehiclepositions");
       const vehiclepositions: VehiclePositions = await response.json();
       vehicleMapRef.current = new Map(
@@ -329,33 +333,46 @@ function Maps() {
         ])
       );
       const { entity } = vehiclepositions;
-      const newMarkerElements: Map<String, JSX.Element> = new Map();
+      const newMarkerElements: Map<string, JSX.Element> = new Map();
+
       entity.forEach((entity: Entity) => {
         const { vehicle } = entity;
+        const endLat = vehicle.position.latitude;
+        const endLng = vehicle.position.longitude;
+        if (!endLat && !endLng) return; // null island
+        const endLatLng = new google.maps.LatLng(endLat, endLng);
         const vehicleMarkers = markersMap.get(vehicle.vehicle.id);
         if (vehicleMarkers) {
-          vehicleMarkers.forEach((marker, i) => {
-            if (i === 1) {
-              animateMarker(
-                marker,
-                new google.maps.LatLng(
-                  vehicle.position.latitude,
-                  vehicle.position.longitude
-                ),
-                vehicle.position.bearing
-              );
-            } else {
-              animateMarker(
-                marker,
-                new google.maps.LatLng(
-                  vehicle.position.latitude,
-                  vehicle.position.longitude
-                )
-              );
-            }
-          });
+          const startLatLng = vehicleMarkers[0].getPosition()!;
+
+          const startLat = startLatLng.lat();
+          const startLng = startLatLng.lng();
+
+          if (startLatLng) {
+            const minLat = Math.min(startLat, endLat);
+            const maxLat = Math.max(startLat, endLat);
+            const minLng = Math.min(startLng, endLng);
+            const maxLng = Math.max(startLng, endLng);
+
+            const movementBounds = new google.maps.LatLngBounds(
+              new google.maps.LatLng(minLat, minLng),
+              new google.maps.LatLng(maxLat, maxLng)
+            );
+
+            if (bounds.intersects(movementBounds))
+              vehicleMarkers.forEach((marker, i) => {
+                animateMarker(
+                  marker,
+                  endLatLng,
+                  i === 1 ? vehicle.position.bearing : undefined
+                );
+              });
+            else
+              vehicleMarkers.forEach((marker) => marker.setPosition(endLatLng));
+          }
           return;
         }
+
         const route = routeMap.get(vehicle.trip.route_id);
         if (!route) return null;
         const { strokeColor } = getRouteColor(route);
@@ -459,7 +476,7 @@ function Maps() {
   function animateMarker(
     marker: google.maps.Marker,
     endPosition: google.maps.LatLng,
-    bearing?: number
+    endBearing?: number
   ) {
     const startPosition = marker.getPosition();
     if (!startPosition) return;
@@ -473,6 +490,9 @@ function Maps() {
       return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
     }
 
+    const icon = marker.getIcon() as google.maps.Symbol;
+    const startBearing = (icon.rotation ?? 0) % 360;
+
     function animateStep(timestamp: number) {
       const elapsed = timestamp - startTime;
       const progress = Math.min(elapsed / MARKER_ANIMATION_DURATION, 1);
@@ -481,15 +501,18 @@ function Maps() {
       const lat = startLat + (endPosition.lat() - startLat) * easedProgress;
       const lng = startLng + (endPosition.lng() - startLng) * easedProgress;
 
+      let newBearing = startBearing;
+      if (endBearing !== undefined) {
+        const delta = ((endBearing - startBearing + 540) % 360) - 180;
+        newBearing = startBearing + delta * easedProgress;
+      }
+
       marker.setPosition(new google.maps.LatLng(lat, lng));
 
-      if (bearing) {
-        const icon = marker.getIcon() as google.maps.Icon;
+      if (endBearing !== undefined) {
         marker.setIcon({
           ...icon,
-          fillOpacity: 1,
-          rotation: bearing,
-          strokeWeight: 1,
+          rotation: newBearing,
         });
       }
 
