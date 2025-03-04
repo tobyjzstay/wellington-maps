@@ -25,25 +25,23 @@ import styles from "./maps.module.css";
 import { Point } from "./point";
 import {
   BusRouteType,
-  RouteId,
-  RouteType,
   getBusRouteType,
   getRouteColor,
+  getRouteMap,
+  getShapeMap,
+  getTripMap,
+  getZIndex,
+  RouteId,
+  RouteType,
+  ZIndexLayer,
 } from "./util";
 
 const CENTER = { lat: -41.2529601, lng: 174.7542577 };
 const MARKER_ANIMATION_DURATION = 1000;
 const MIN_PIXEL_MOVEMENT = 5;
-const UPDATE_INTERVAL = 5000;
-const Z_INDEX_BUFFER = 10000;
+const UPDATE_INTERVAL = 1000;
 const ZOOM = 12;
 const ZOOM_DEBOUNCE = 1000;
-
-export enum ZIndexLayer {
-  POLYLINE,
-  POLYLINE_SELECTED,
-  MARKER,
-}
 
 export const MapContext = React.createContext<google.maps.Map | null>(null);
 export const MarkersMapContext = React.createContext<
@@ -216,7 +214,7 @@ function Maps() {
       const bounds = new google.maps.LatLngBounds();
       simplifiedPath.forEach((point) => bounds.extend(point));
       const onClick = () => {
-        const zIndex = zIndexGen(id, ZIndexLayer.POLYLINE_SELECTED);
+        const zIndex = getZIndex(id, ZIndexLayer.POLYLINE_SELECTED);
         const outline = new google.maps.Polyline({
           path,
           strokeColor: "#ffffff",
@@ -232,7 +230,7 @@ function Maps() {
         setSelectedPolylines([outline, fill]);
         map.fitBounds(bounds);
       };
-      const zIndex = zIndexGen(
+      const zIndex = getZIndex(
         routeIdValues.indexOf(route_id),
         ZIndexLayer.POLYLINE
       );
@@ -424,7 +422,7 @@ function Maps() {
               const bounds = new google.maps.LatLngBounds();
               path.forEach((point) => bounds.extend(point));
 
-              const zIndex = zIndexGen(
+              const zIndex = getZIndex(
                 parseInt(vehicle.vehicle.id),
                 ZIndexLayer.POLYLINE_SELECTED
               );
@@ -704,47 +702,6 @@ function Maps() {
       </MapContext.Provider>
     </div>
   );
-}
-
-export function zIndexGen(id: number, layer: ZIndexLayer) {
-  return Z_INDEX_BUFFER * (layer + 1) - id;
-}
-
-async function getRouteMap() {
-  const response = await fetch("/api/routes");
-  if (!response.ok) return null;
-  const routes: Route[] = await response.json();
-  const routeMap = new Map<number, Route>();
-  for (const route of routes) {
-    const route_id = parseInt(route.route_id);
-    routeMap.set(route_id, route);
-  }
-  return routeMap;
-}
-
-async function getShapeMap() {
-  const response = await fetch("/api/shapes");
-  if (!response.ok) return null;
-  const shapes: Shape[] = await response.json();
-  const shapeMap = new Map<string, Shape[]>();
-  for (let i = 0; i < shapes.length; i++) {
-    const shape = shapes[i];
-    const { shape_id } = shape;
-    if (!shapeMap.has(shape_id)) shapeMap.set(shape_id, []);
-    shapeMap.get(shape_id)!.push(shape);
-  }
-  return shapeMap;
-}
-
-async function getTripMap() {
-  const response = await fetch("/api/trips");
-  if (!response.ok) return null;
-  const trips: Trip[] = await response.json();
-  const tripMap = new Map<string, Trip>();
-  for (const trip of trips) {
-    tripMap.set(trip.trip_id, trip);
-  }
-  return tripMap;
 }
 
 export default Maps;

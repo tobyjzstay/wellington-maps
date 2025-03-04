@@ -1,4 +1,8 @@
 import { Route } from "./api/routes/route";
+import { Shape } from "./api/shapes/route";
+import { Trip } from "./api/trips/route";
+
+const Z_INDEX_BUFFER = 10000;
 
 export enum RouteType {
   RAIL = 2,
@@ -13,19 +17,6 @@ export enum BusRouteType {
   STANDARD,
   PEAK_EXPRESS_EXTENDED,
   MIDNIGHT,
-}
-
-export function getRouteTypeColor(route_type: RouteType | string) {
-  switch (route_type) {
-    case RouteType.RAIL:
-      return "#784e90";
-    case RouteType.BUS:
-      return "#4e801f";
-    case RouteType.FERRY:
-      return "#0093b2";
-    default:
-      return null;
-  }
 }
 
 export enum RouteId {
@@ -250,7 +241,13 @@ export enum RouteId {
   ROUTE_955 = "9550",
 }
 
-export function getBusRouteType(route_id: RouteId | string) {
+export enum ZIndexLayer {
+  POLYLINE,
+  POLYLINE_SELECTED,
+  MARKER,
+}
+
+export function getBusRouteType(route_id: RouteId) {
   switch (route_id) {
     case RouteId.ROUTE_AX:
     case RouteId.ROUTE_1:
@@ -392,4 +389,58 @@ export function getRouteColor(route: Route) {
   }
 
   return { color, fillColor, strokeColor, typeFillColor };
+}
+
+export function getRouteTypeColor(route_type: RouteType) {
+  switch (route_type) {
+    case RouteType.RAIL:
+      return "#784e90";
+    case RouteType.BUS:
+      return "#4e801f";
+    case RouteType.FERRY:
+      return "#0093b2";
+    default:
+      return null;
+  }
+}
+
+export async function getRouteMap() {
+  const response = await fetch("/api/routes");
+  if (!response.ok) return null;
+  const routes: Route[] = await response.json();
+  const routeMap = new Map<number, Route>();
+  for (const route of routes) {
+    const route_id = parseInt(route.route_id);
+    routeMap.set(route_id, route);
+  }
+  return routeMap;
+}
+
+export async function getShapeMap() {
+  const response = await fetch("/api/shapes");
+  if (!response.ok) return null;
+  const shapes: Shape[] = await response.json();
+  const shapeMap = new Map<string, Shape[]>();
+  for (let i = 0; i < shapes.length; i++) {
+    const shape = shapes[i];
+    const { shape_id } = shape;
+    if (!shapeMap.has(shape_id)) shapeMap.set(shape_id, []);
+    shapeMap.get(shape_id)!.push(shape);
+  }
+  return shapeMap;
+}
+
+export async function getTripMap() {
+  const response = await fetch("/api/trips");
+  if (!response.ok) return null;
+  const trips: Trip[] = await response.json();
+  const tripMap = new Map<string, Trip>();
+  for (const trip of trips) {
+    tripMap.set(trip.trip_id, trip);
+  }
+  return tripMap;
+}
+
+export function getZIndex(id: number, layer: ZIndexLayer) {
+  return Z_INDEX_BUFFER * (layer + 1) - id;
 }

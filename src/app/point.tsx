@@ -1,8 +1,8 @@
 import React from "react";
 import { Route } from "./api/routes/route";
 import { Vehicle } from "./api/vehiclepositions/route";
-import { MarkersMapContext, ZIndexLayer, zIndexGen } from "./maps";
-import { RouteType, getRouteColor } from "./util";
+import { MarkersMapContext } from "./maps";
+import { getRouteColor, getZIndex, RouteType, ZIndexLayer } from "./util";
 
 const MARKER_SCALE = 1;
 const MARKER_BEARING_SCALE = 0.6;
@@ -66,7 +66,7 @@ export function Point({
       break;
   }
 
-  const zIndex = zIndexGen(parseInt(vehicle_id), ZIndexLayer.MARKER) * 3;
+  const zIndex = getZIndex(parseInt(vehicle_id), ZIndexLayer.MARKER) * 3;
 
   const marker = new google.maps.Marker({
     icon: {
