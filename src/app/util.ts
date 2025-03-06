@@ -1,6 +1,11 @@
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Trip } from "./api/trips/route";
+import bus from "./bus.svg";
+import cableCar from "./cable-car.svg";
+import ferry from "./ferry.svg";
+import rail from "./rail.svg";
+import schoolBus from "./school-bus.svg";
 
 const Z_INDEX_BUFFER = 10000;
 
@@ -353,12 +358,11 @@ export function getRouteColor(route: Route) {
   let color = "#" + route_text_color;
   let fillColor = "#" + route_color;
   let strokeColor = "#" + route_color;
-  let typeFillColor;
+  let typeFillColor = getRouteTypeColor(route_type);
 
   switch (route_type) {
     case RouteType.RAIL:
       color = "#ffffff";
-      typeFillColor = "#784e90";
       break;
     case RouteType.BUS:
       switch (getBusRouteType(route_id)) {
@@ -375,7 +379,6 @@ export function getRouteColor(route: Route) {
           fillColor = "#ffffff";
           break;
       }
-      typeFillColor = "#4e801f";
       break;
     case RouteType.FERRY:
       color = "#ffffff";
@@ -394,13 +397,32 @@ export function getRouteColor(route: Route) {
 export function getRouteTypeColor(route_type: RouteType) {
   switch (route_type) {
     case RouteType.RAIL:
+    case RouteType.CABLE_CAR:
       return "#784e90";
     case RouteType.BUS:
+    case RouteType.SCHOOL_BUS:
       return "#4e801f";
     case RouteType.FERRY:
       return "#0093b2";
     default:
       return null;
+  }
+}
+
+export function getRouteTypeSvg(route_type: RouteType): string {
+  switch (route_type) {
+    case RouteType.RAIL:
+      return rail;
+    case RouteType.BUS:
+      return bus;
+    case RouteType.FERRY:
+      return ferry;
+    case RouteType.CABLE_CAR:
+      return cableCar;
+    case RouteType.SCHOOL_BUS:
+      return schoolBus;
+    default:
+      return "";
   }
 }
 

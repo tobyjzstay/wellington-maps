@@ -1,0 +1,70 @@
+.point-marker {
+  position: absolute;
+}
+
+.point-marker-icon {
+  border-radius: 50%;
+  height: 32px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+}
+
+.point-marker-label {
+  border-radius: 50%;
+  font-family: roboto, sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.point-bearing {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+}
+
+.point-bearing-svg {
+  height: 16px;
+  position: absolute;
+  stroke: #ffffff;
+  stroke-width: 1px;
+  transform-origin: center;
+  width: 16px;
+}
+
+.point-type {
+  position: absolute;
+  transform: translate(14px, 14px);
+}
+
+.point-type-icon {
+  border: 1px solid #ffffff;
+  border-radius: 50%;
+  height: 16px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+}
+
+.point-type-icon-svg {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  height: 10px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+}

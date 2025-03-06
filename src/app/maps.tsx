@@ -17,11 +17,7 @@ import simplify from "simplify-js";
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Trip } from "./api/trips/route";
-import {
-  Entity,
-  Vehicle,
-  VehiclePositions,
-} from "./api/vehiclepositions/route";
+import { Vehicle, VehiclePositions } from "./api/vehiclepositions/route";
 import styles from "./maps.module.css";
 import { Point } from "./point";
 import {
@@ -38,15 +34,13 @@ import {
 } from "./util";
 
 const CENTER = { lat: -41.2529601, lng: 174.7542577 };
-const MARKER_ANIMATION_DURATION = 1000;
-const MIN_PIXEL_MOVEMENT = 5;
-const UPDATE_INTERVAL = 1000;
+const UPDATE_INTERVAL = 5000;
 const ZOOM = 12;
 const ZOOM_DEBOUNCE = 1000;
 
 export const MapContext = React.createContext<google.maps.Map | null>(null);
 export const MarkersMapContext = React.createContext<
-  Map<String, google.maps.Marker[]>
+  Map<string, google.maps.marker.AdvancedMarkerElement[]>
 >(new Map());
 
 const routeIdValues = Object.values(RouteId);
@@ -59,21 +53,10 @@ function Maps() {
   const onMapLoad = (map: google.maps.Map) => {
     map.setOptions({
       center: CENTER,
+      mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       disableDefaultUI: true,
       keyboardShortcuts: false,
-      styles: [
-        {
-          featureType: "poi",
-          elementType: "labels",
-          stylers: [{ visibility: "off" }],
-        },
-        {
-          featureType: "transit.line",
-          elementType: "all",
-          stylers: [{ visibility: "off" }],
-        },
-      ],
       zoom: ZOOM,
     });
     setMap(map);
@@ -122,7 +105,9 @@ function Maps() {
     );
   }, []);
 
-  const vehicleMapRef = React.useRef<Map<String, Vehicle>>(new Map());
+  const [vehicleMap, setVehicleMap] = React.useState<Map<string, Vehicle>>(
+    new Map()
+  );
 
   const [rail, setRail] = React.useState(true);
   const [frequent, setFrequent] = React.useState(true);
@@ -303,9 +288,6 @@ function Maps() {
   }, [selectedPolylines, map]);
 
   const markersMap = React.useContext(MarkersMapContext);
-  const [markerElements, setMarkerElements] = React.useState<
-    Map<String, JSX.Element>
-  >(new Map());
   const [vehicleType, setVehicleType] = React.useState(false);
   React.useEffect(() => {
     if (!routeMap || !shapesMap || !tripMap) return;
@@ -317,230 +299,24 @@ function Maps() {
     return () => clearInterval(interval);
 
     async function update() {
-      if (!map || !routeMap || !shapesMap || !tripMap) return;
-
-      const bounds = map.getBounds();
-      if (!bounds) return;
-
-      const projection = map.getProjection();
-      if (!projection) return;
-
-      const zoom = map.getZoom();
-      if (!zoom) return;
-
       const response = await fetch("/api/vehiclepositions");
       const vehiclepositions: VehiclePositions = await response.json();
-      vehicleMapRef.current = new Map(
-        vehiclepositions.entity.map((entity) => [
-          entity.vehicle.vehicle.id,
-          entity.vehicle,
-        ])
-      );
-      const { entity } = vehiclepositions;
-      const newMarkerElements: Map<string, JSX.Element> = new Map();
-
-      entity.forEach((entity: Entity) => {
-        const { vehicle } = entity;
-        const endLat = vehicle.position.latitude;
-        const endLng = vehicle.position.longitude;
-        if (!endLat && !endLng) return; // null island
-        const endLatLng = new google.maps.LatLng(endLat, endLng);
-        const vehicleMarkers = markersMap.get(vehicle.vehicle.id);
-        if (vehicleMarkers) {
-          const startLatLng = vehicleMarkers[0].getPosition()!;
-
-          const startLat = startLatLng.lat();
-          const startLng = startLatLng.lng();
-
-          if (startLatLng) {
-            const minLat = Math.min(startLat, endLat);
-            const maxLat = Math.max(startLat, endLat);
-            const minLng = Math.min(startLng, endLng);
-            const maxLng = Math.max(startLng, endLng);
-
-            const movementBounds = new google.maps.LatLngBounds(
-              new google.maps.LatLng(minLat, minLng),
-              new google.maps.LatLng(maxLat, maxLng)
-            );
-
-            if (!bounds.intersects(movementBounds)) {
-              vehicleMarkers.forEach((marker) => marker.setPosition(endLatLng));
-              return;
-            }
-
-            const startPoint = projection.fromLatLngToPoint(startLatLng);
-            const endPoint = projection.fromLatLngToPoint(endLatLng);
-
-            if (!startPoint || !endPoint) return;
-
-            const deltaX =
-              Math.abs(endPoint.x - startPoint.x) * Math.pow(2, zoom);
-            const deltaY =
-              Math.abs(endPoint.y - startPoint.y) * Math.pow(2, zoom);
-            const movementDistance = Math.sqrt(deltaX ** 2 + deltaY ** 2);
-
-            if (movementDistance >= MIN_PIXEL_MOVEMENT)
-              vehicleMarkers.forEach((marker, i) => {
-                animateMarker(
-                  marker,
-                  endLatLng,
-                  i === 1 ? vehicle.position.bearing : undefined
-                );
-              });
-            else
-              vehicleMarkers.forEach((marker) => marker.setPosition(endLatLng));
+      setVehicleMap((prevVehicleMap) => {
+        const newVehicleMap = new Map(prevVehicleMap);
+        vehiclepositions.entity.forEach((entity) => {
+          const { vehicle } = entity;
+          newVehicleMap.set(vehicle.vehicle.id, vehicle);
+        });
+        prevVehicleMap.forEach((_, key) => {
+          if (!newVehicleMap.has(key)) {
+            markersMap.get(key)?.forEach((marker) => (marker.map = null));
+            newVehicleMap.delete(key);
           }
-          return;
-        }
-
-        const route = routeMap.get(vehicle.trip.route_id);
-        if (!route) return null;
-        const { strokeColor } = getRouteColor(route);
-        const { route_id, route_type } = route;
-        const busRouteType = getBusRouteType(route_id)!;
-        newMarkerElements.set(
-          vehicle.vehicle.id,
-          <Point
-            key={vehicle.vehicle.id}
-            onClick={() => {
-              if (!map) return;
-
-              const trip_id = vehicle.trip.trip_id;
-              const trip = tripMap.get(trip_id);
-              if (!trip) return;
-
-              const { shape_id } = trip;
-              let shapes = shapesMap.get(shape_id);
-              if (!shapes) return;
-
-              const path = shapes.map((shape) => ({
-                lat: shape.shape_pt_lat,
-                lng: shape.shape_pt_lon,
-              }));
-
-              const bounds = new google.maps.LatLngBounds();
-              path.forEach((point) => bounds.extend(point));
-
-              const zIndex = getZIndex(
-                parseInt(vehicle.vehicle.id),
-                ZIndexLayer.POLYLINE_SELECTED
-              );
-
-              const outline = new google.maps.Polyline({
-                path,
-                strokeColor: "#ffffff",
-                strokeWeight: 9,
-                zIndex: zIndex - 1,
-              });
-              const fill = new google.maps.Polyline({
-                path,
-                strokeColor,
-                strokeWeight: 6,
-                zIndex: zIndex,
-              });
-              setSelectedPolylines([outline, fill]);
-              map.fitBounds(bounds);
-            }}
-            route={route}
-            vehicle={vehicle}
-            vehicleType={vehicleType}
-            visible={getVisibility(route_type, busRouteType)}
-          />
-        );
-      });
-      setMarkerElements((prevMarkerElements) => {
-        const updatedMarkers = new Map(prevMarkerElements);
-        newMarkerElements.forEach((value, key) => {
-          updatedMarkers.set(key, value);
         });
-        return updatedMarkers;
-      });
-      markersMap.forEach((vehicleMarkers, vehicleId) => {
-        if (!vehicleMapRef.current.has(vehicleId)) {
-          vehicleMarkers.forEach((marker) => marker.setMap(null));
-          markersMap.delete(vehicleId);
-        } else {
-          vehicleMarkers.forEach((marker) => marker.setMap(map));
-        }
+        return newVehicleMap;
       });
     }
-  }, [
-    map,
-    routeMap,
-    shapesMap,
-    tripMap,
-    vehicleType,
-    getVisibility,
-    markersMap,
-  ]);
-
-  React.useEffect(() => {
-    if (!routeMap || !vehicleMapRef.current) return;
-    markersMap.forEach((vehicleMarkers, vehicleId) => {
-      vehicleMarkers.forEach((marker, index) => {
-        const vehicle = vehicleMapRef.current.get(vehicleId);
-        if (!vehicle) return;
-        const { trip } = vehicle;
-        const { route_id: trip_route_id } = trip;
-        const route = routeMap.get(trip_route_id);
-        if (!route) return;
-        const { route_id, route_type } = route;
-        const busRouteType = getBusRouteType(route_id)!;
-        marker.setVisible(
-          vehicleType || (index <= 1 && getVisibility(route_type, busRouteType))
-        );
-      });
-    });
-  }, [getVisibility, markersMap, routeMap, vehicleType]);
-
-  function animateMarker(
-    marker: google.maps.Marker,
-    endPosition: google.maps.LatLng,
-    endBearing?: number
-  ) {
-    const startPosition = marker.getPosition();
-    if (!startPosition) return;
-
-    const startLat = startPosition.lat();
-    const startLng = startPosition.lng();
-
-    const startTime = performance.now();
-
-    function easeInOutQuad(t: number) {
-      return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-    }
-
-    const icon = marker.getIcon() as google.maps.Symbol;
-    const startBearing = (icon.rotation ?? 0) % 360;
-
-    function animateStep(timestamp: number) {
-      const elapsed = timestamp - startTime;
-      const progress = Math.min(elapsed / MARKER_ANIMATION_DURATION, 1);
-      const easedProgress = easeInOutQuad(progress);
-
-      const lat = startLat + (endPosition.lat() - startLat) * easedProgress;
-      const lng = startLng + (endPosition.lng() - startLng) * easedProgress;
-
-      let newBearing = startBearing;
-      if (endBearing !== undefined) {
-        const delta = ((endBearing - startBearing + 540) % 360) - 180;
-        newBearing = startBearing + delta * easedProgress;
-      }
-
-      marker.setPosition(new google.maps.LatLng(lat, lng));
-
-      if (endBearing !== undefined) {
-        marker.setIcon({
-          ...icon,
-          rotation: newBearing,
-        });
-      }
-
-      if (progress < 1) requestAnimationFrame(animateStep);
-    }
-
-    requestAnimationFrame(animateStep);
-  }
+  }, [routeMap, shapesMap, tripMap, getVisibility, markersMap]);
 
   return (
     <GoogleMap onLoad={onMapLoad}>
@@ -699,7 +475,64 @@ function Maps() {
         <MapContext.Provider value={map}>
           <MarkersMapContext.Provider value={markersMap}>
             <div className={styles["maps-map"]} />
-            {Array.from(markerElements.values())}
+            <>
+              {Array.from(vehicleMap).map(([vehicleId, vehicle]) => {
+                if (!map || !routeMap || !shapesMap || !tripMap) return;
+                const route = routeMap.get(vehicle.trip.route_id);
+                if (!route) return null;
+                const { strokeColor } = getRouteColor(route);
+                const { route_id, route_type } = route;
+                const busRouteType = getBusRouteType(route_id)!;
+                return (
+                  <Point
+                    key={vehicleId}
+                    onClick={() => {
+                      if (!map || !tripMap || !shapesMap || !routeMap) return;
+
+                      const trip_id = vehicle.trip.trip_id;
+                      const trip = tripMap.get(trip_id);
+                      if (!trip) return;
+
+                      const { shape_id } = trip;
+                      let shapes = shapesMap.get(shape_id);
+                      if (!shapes) return;
+
+                      const path = shapes.map((shape) => ({
+                        lat: shape.shape_pt_lat,
+                        lng: shape.shape_pt_lon,
+                      }));
+
+                      const bounds = new google.maps.LatLngBounds();
+                      path.forEach((point) => bounds.extend(point));
+
+                      const zIndex = getZIndex(
+                        parseInt(vehicle.vehicle.id),
+                        ZIndexLayer.POLYLINE_SELECTED
+                      );
+
+                      const outline = new google.maps.Polyline({
+                        path,
+                        strokeColor: "#ffffff",
+                        strokeWeight: 9,
+                        zIndex: zIndex - 1,
+                      });
+                      const fill = new google.maps.Polyline({
+                        path,
+                        strokeColor,
+                        strokeWeight: 6,
+                        zIndex: zIndex,
+                      });
+                      setSelectedPolylines([outline, fill]);
+                      map.fitBounds(bounds);
+                    }}
+                    route={route}
+                    vehicle={vehicle}
+                    vehicleType={vehicleType}
+                    visible={getVisibility(route_type, busRouteType)}
+                  />
+                );
+              })}
+            </>
           </MarkersMapContext.Provider>
         </MapContext.Provider>
       </div>
