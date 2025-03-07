@@ -53,11 +53,14 @@ function Maps() {
   const onMapLoad = (map: google.maps.Map) => {
     map.setOptions({
       center: CENTER,
+      clickableIcons: false,
+      disableDefaultUI: true,
+      isFractionalZoomEnabled: true,
       mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
-      disableDefaultUI: true,
-      keyboardShortcuts: false,
+      scaleControl: true,
       zoom: ZOOM,
+      zoomControl: true,
     });
     setMap(map);
   };
