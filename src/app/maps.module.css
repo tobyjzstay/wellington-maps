@@ -4,8 +4,18 @@
   height: 100vh;
 }
 
+.maps-map > div {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .maps-map {
   flex-grow: 1;
+  position: relative;
+  height: 100%;
 }
 
 .maps-drawer {
