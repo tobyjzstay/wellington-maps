@@ -353,37 +353,45 @@ export function getBusRouteType(route_id: RouteId) {
   }
 }
 
-export function getRouteColor(route: Route) {
+export function getRouteColors(route: Route) {
   const { route_id, route_type, route_color, route_text_color } = route;
 
-  let color = "#" + route_text_color;
-  let fillColor = "#" + route_color;
-  let strokeColor = "#" + route_color;
-  let typeFillColor = getRouteTypeColor(route_type);
+  const colors = Object.create({
+    backgroundColor: "#" + route_color,
+    bearingColor: "#" + route_color,
+    polylineColor: "#" + route_color,
+    strokeColor: "#" + route_color,
+    textColor: "#" + route_text_color,
+    typeColor: getRouteTypeColor(route_type),
+  });
 
   switch (route_type) {
     case RouteType.RAIL:
-      color = "#ffffff";
+      // override Metlink's rail color (#000000)
+      colors.textColor = "#ffffff";
       break;
     case RouteType.BUS:
       switch (getBusRouteType(route_id)) {
         case BusRouteType.FREQUENT:
-          color = "#ffffff";
+          colors.textColor = "#ffffff";
+          break;
+        case BusRouteType.STANDARD:
+        case BusRouteType.PEAK_EXPRESS_EXTENDED:
+          colors.backgroundColor = "#ffffff";
+          colors.textColor = "#" + route_color;
           break;
         case BusRouteType.MIDNIGHT:
-          color = "#fff200";
-          fillColor = "#3d3d3d";
-          strokeColor = "#3d3d3d";
+          colors.backgroundColor = "#3d3d3d";
+          colors.polylineColor = "#3d3d3d";
+          colors.strokeColor = "#3d3d3d";
+          colors.textColor = "#fff200";
           break;
         default:
-          color = "#" + route_color;
-          fillColor = "#ffffff";
           break;
       }
       break;
     case RouteType.FERRY:
-      color = "#ffffff";
-      typeFillColor = "#0093b2";
+      colors.textColor = "#ffffff";
       break;
     case RouteType.CABLE_CAR:
     case RouteType.SCHOOL_BUS:
@@ -392,7 +400,7 @@ export function getRouteColor(route: Route) {
       break;
   }
 
-  return { color, fillColor, strokeColor, typeFillColor };
+  return colors;
 }
 
 export function getRouteTypeColor(route_type: RouteType) {

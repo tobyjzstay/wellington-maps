@@ -3,7 +3,12 @@ import { Route } from "./api/routes/route";
 import { Vehicle } from "./api/vehiclepositions/route";
 import { MapContext, MarkersMapContext } from "./maps";
 import styles from "./point.module.css";
-import { getRouteColor, getRouteTypeSvg, getZIndex, ZIndexLayer } from "./util";
+import {
+  getRouteColors,
+  getRouteTypeSvg,
+  getZIndex,
+  ZIndexLayer,
+} from "./util";
 
 const MARKER_ANIMATION_DURATION = 1000;
 const MIN_PIXEL_MOVEMENT = 5;
@@ -39,7 +44,8 @@ export function Point({
   const vehicle_id = vehicle.vehicle.id;
   const stale = Math.floor(Date.now() / 1000) - timestamp > STALE_DURATION;
 
-  const { color, fillColor, strokeColor, typeFillColor } = getRouteColor(route);
+  const { backgroundColor, polylineColor, strokeColor, textColor, typeColor } =
+    getRouteColors(route);
 
   const zIndex =
     getZIndex(
@@ -63,14 +69,14 @@ export function Point({
 
       const icon = document.createElement("div");
       icon.className = styles["point-marker-icon"];
-      icon.style.backgroundColor = fillColor;
+      icon.style.backgroundColor = backgroundColor;
       icon.style.border = `1px solid ${strokeColor}`;
       markerContent.appendChild(icon);
 
       const label = document.createElement("div");
       label.className = styles["point-marker-label"];
       label.innerText = route_short_name;
-      label.style.color = color;
+      label.style.color = textColor;
       markerContent.appendChild(label);
 
       markerRef.current = new google.maps.marker.AdvancedMarkerElement({
@@ -96,7 +102,7 @@ export function Point({
       bearingContent.style.transform = `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px)`;
 
       const bearingSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -9 22 15" classname="${styles["point-bearing-svg"]}">
-      <path d="M 0 -2 L 0 -2 L -7 5 L -10 2 L 0 -8 L 10 2 L 7 5 Z"  fill="${strokeColor}"/>
+      <path d="M 0 -2 L 0 -2 L -7 5 L -10 2 L 0 -8 L 10 2 L 7 5 Z"  fill="${polylineColor}"/>
     </svg>
   `;
       bearingContent.innerHTML = bearingSvg;
@@ -133,7 +139,7 @@ export function Point({
 
       const typeIcon = document.createElement("div");
       typeIcon.className = styles["point-type-icon"];
-      typeIcon.style.backgroundColor = typeFillColor!;
+      typeIcon.style.backgroundColor = typeColor!;
 
       typeContent.appendChild(typeIcon);
 

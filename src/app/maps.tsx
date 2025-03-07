@@ -23,7 +23,7 @@ import { Point } from "./point";
 import {
   BusRouteType,
   getBusRouteType,
-  getRouteColor,
+  getRouteColors,
   getRouteMap,
   getShapeMap,
   getTripMap,
@@ -178,7 +178,7 @@ function Maps() {
       const { route_id, route_type } = route;
       const shapes = shapesMap.get(shape_id);
       if (!shapes) return;
-      const { strokeColor } = getRouteColor(route);
+      const { polylineColor } = getRouteColors(route);
       let path = shapes.map((shape) => ({
         lat: shape.shape_pt_lat,
         lng: shape.shape_pt_lon,
@@ -207,7 +207,7 @@ function Maps() {
         });
         const fill = new google.maps.Polyline({
           path,
-          strokeColor,
+          strokeColor: polylineColor,
           strokeWeight: 6,
           zIndex: zIndex,
         });
@@ -233,7 +233,7 @@ function Maps() {
       outline.addListener("click", onClick);
       const fill = new google.maps.Polyline({
         path: simplifiedPath,
-        strokeColor,
+        strokeColor: polylineColor,
         strokeWeight: 2,
         visible: getVisibility(route_type, busRouteType),
         zIndex: zIndex,
@@ -491,7 +491,7 @@ function Maps() {
                 if (!map || !routeMap || !shapesMap || !tripMap) return;
                 const route = routeMap.get(vehicle.trip.route_id);
                 if (!route) return null;
-                const { strokeColor } = getRouteColor(route);
+                const { polylineColor } = getRouteColors(route);
                 const { route_id, route_type } = route;
                 const busRouteType = getBusRouteType(route_id)!;
                 return (
@@ -512,6 +512,8 @@ function Maps() {
                         lng: shape.shape_pt_lon,
                       }));
 
+                      console.log("clicked", vehicle);
+
                       const bounds = new google.maps.LatLngBounds();
                       path.forEach((point) => bounds.extend(point));
 
@@ -528,7 +530,7 @@ function Maps() {
                       });
                       const fill = new google.maps.Polyline({
                         path,
-                        strokeColor,
+                        strokeColor: polylineColor,
                         strokeWeight: 6,
                         zIndex: zIndex,
                       });
