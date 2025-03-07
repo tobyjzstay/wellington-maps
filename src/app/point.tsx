@@ -61,6 +61,8 @@ export function Point({
       lng: longitude,
     };
 
+    if (newPosition.lat === 0 && newPosition.lng === 0) return; // null island
+
     if (!markerRef.current) {
       const markerContent = document.createElement("div");
       markerContent.className = styles["point-marker"];
