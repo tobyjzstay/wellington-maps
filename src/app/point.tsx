@@ -7,6 +7,7 @@ import { getRouteColor, getRouteTypeSvg, getZIndex, ZIndexLayer } from "./util";
 
 const MARKER_ANIMATION_DURATION = 1000;
 const MIN_PIXEL_MOVEMENT = 5;
+const STALE_DURATION = 30;
 
 export function Point({
   onClick,
@@ -30,17 +31,24 @@ export function Point({
     React.useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const typeMarkerRef =
     React.useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const markerRefs = [markerRef, bearingMarkerRef, typeMarkerRef];
 
   const { id, route_id, route_short_name, route_long_name, route_type } = route;
-  const { latitude, longitude, bearing } = vehicle.position;
+  const { position, timestamp } = vehicle;
+  const { latitude, longitude, bearing } = position;
   const vehicle_id = vehicle.vehicle.id;
+  const stale = Math.floor(Date.now() / 1000) - timestamp > STALE_DURATION;
 
   const { color, fillColor, strokeColor, typeFillColor } = getRouteColor(route);
 
-  const zIndex = getZIndex(id, ZIndexLayer.MARKER) * 3;
+  const zIndex =
+    getZIndex(
+      parseInt(vehicle_id) ?? parseInt(route_id),
+      stale ? ZIndexLayer.MARKER_STALE : ZIndexLayer.MARKER
+    ) * markerRefs.length;
 
   React.useEffect(() => {
-    if (!map) return;
+    if (!map || !markersMap?.current) return;
 
     const newPosition: google.maps.LatLngLiteral = {
       lat: latitude,
@@ -51,6 +59,7 @@ export function Point({
       const markerContent = document.createElement("div");
       markerContent.className = styles["point-marker"];
       markerContent.style.visibility = visible ? "visible" : "hidden";
+      markerContent.style.opacity = stale ? "0.5" : "1";
 
       const icon = document.createElement("div");
       icon.className = styles["point-marker-icon"];
@@ -71,12 +80,15 @@ export function Point({
         title: route_long_name,
         zIndex,
       });
-    } else setMarkerPosition(map, markerRef.current, visible, newPosition);
+      markerRef.current.addListener("gmp-click", onClick);
+    } else
+      updateMarker(map, markerRef.current, visible, stale, zIndex, newPosition);
 
     if (!bearingMarkerRef.current) {
       const bearingContent = document.createElement("div");
       bearingContent.className = styles["point-bearing"];
       bearingContent.style.visibility = visible ? "visible" : "hidden";
+      bearingContent.style.opacity = stale ? "0.5" : "1";
 
       const bearingRad = (bearing * Math.PI) / 180;
       const offsetX = 24 * Math.sin(bearingRad);
@@ -100,11 +112,14 @@ export function Point({
         title: route_long_name,
         zIndex: zIndex + 2,
       });
+      bearingMarkerRef.current.addListener("gmp-click", onClick);
     } else
-      setMarkerPosition(
+      updateMarker(
         map,
         bearingMarkerRef.current,
         visible,
+        stale,
+        zIndex + 2,
         newPosition,
         bearing
       );
@@ -114,6 +129,7 @@ export function Point({
       typeContent.className = styles["point-type"];
       typeContent.style.visibility =
         visible && vehicleType ? "visible" : "hidden";
+      typeContent.style.opacity = stale ? "0.5" : "1";
 
       const typeIcon = document.createElement("div");
       typeIcon.className = styles["point-type-icon"];
@@ -134,11 +150,14 @@ export function Point({
         title: route_long_name,
         zIndex: zIndex + 1,
       });
+      typeMarkerRef.current.addListener("gmp-click", onClick);
     } else
-      setMarkerPosition(
+      updateMarker(
         map,
         typeMarkerRef.current,
         visible && vehicleType,
+        stale,
+        zIndex + 1,
         newPosition
       );
 
@@ -147,8 +166,7 @@ export function Point({
       bearingMarkerRef.current,
       typeMarkerRef.current,
     ];
-    markers.forEach((marker) => marker.addListener("gmp-click", onClick));
-    markersMap.set(vehicle_id, markers);
+    markersMap.current.set(vehicle_id, markers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     bearing,
@@ -157,6 +175,7 @@ export function Point({
     map,
     markersMap,
     onClick,
+    stale,
     vehicleType,
     visible,
     zIndex,
@@ -164,16 +183,21 @@ export function Point({
   return null;
 }
 
-const setMarkerPosition = (
+const updateMarker = (
   map: google.maps.Map,
   marker: google.maps.marker.AdvancedMarkerElement,
   visible: boolean,
+  stale: boolean,
+  zIndex: number,
   endPosition: google.maps.LatLngLiteral,
   endBearing?: number
 ) => {
   const markerContent = marker.content as HTMLElement;
+  marker.zIndex = zIndex;
   const prevVisible = markerContent.style.visibility === "visible";
+  markerContent.style.opacity = stale ? "0.5" : "1";
   markerContent.style.visibility = visible ? "visible" : "hidden";
+
   if (!visible) return;
   else if (!prevVisible) {
     marker.position = endPosition;

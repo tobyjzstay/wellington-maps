@@ -39,9 +39,9 @@ const ZOOM = 12;
 const ZOOM_DEBOUNCE = 1000;
 
 export const MapContext = React.createContext<google.maps.Map | null>(null);
-export const MarkersMapContext = React.createContext<
+export const MarkersMapContext = React.createContext<React.MutableRefObject<
   Map<string, google.maps.marker.AdvancedMarkerElement[]>
->(new Map());
+> | null>(null);
 
 const routeIdValues = Object.values(RouteId);
 
@@ -287,7 +287,9 @@ function Maps() {
     };
   }, [selectedPolylines, map]);
 
-  const markersMap = React.useContext(MarkersMapContext);
+  const markersMapRef = React.useRef(
+    new Map<string, google.maps.marker.AdvancedMarkerElement[]>()
+  );
   const [vehicleType, setVehicleType] = React.useState(false);
   React.useEffect(() => {
     if (!routeMap || !shapesMap || !tripMap) return;
@@ -301,22 +303,31 @@ function Maps() {
     async function update() {
       const response = await fetch("/api/vehiclepositions");
       const vehiclepositions: VehiclePositions = await response.json();
+
+      // TODO: fix triggering twice
       setVehicleMap((prevVehicleMap) => {
+        const updatedVehicleIds = new Set<string>();
         const newVehicleMap = new Map(prevVehicleMap);
         vehiclepositions.entity.forEach((entity) => {
           const { vehicle } = entity;
-          newVehicleMap.set(vehicle.vehicle.id, vehicle);
+          const vehicleId = vehicle.vehicle.id;
+          newVehicleMap.set(vehicleId, vehicle);
+          updatedVehicleIds.add(vehicleId);
         });
-        prevVehicleMap.forEach((_, key) => {
-          if (!newVehicleMap.has(key)) {
-            markersMap.get(key)?.forEach((marker) => (marker.map = null));
-            newVehicleMap.delete(key);
+        prevVehicleMap.forEach((_, vehicleId) => {
+          if (!updatedVehicleIds.has(vehicleId)) {
+            newVehicleMap.delete(vehicleId);
+            const markers = markersMapRef.current.get(vehicleId);
+            if (markers) {
+              markers.forEach((marker) => (marker.map = null));
+              markersMapRef.current.delete(vehicleId);
+            }
           }
         });
         return newVehicleMap;
       });
     }
-  }, [routeMap, shapesMap, tripMap, getVisibility, markersMap]);
+  }, [routeMap, shapesMap, tripMap, getVisibility]);
 
   return (
     <GoogleMap onLoad={onMapLoad}>
@@ -473,7 +484,7 @@ function Maps() {
           </FormGroup>
         </Drawer>
         <MapContext.Provider value={map}>
-          <MarkersMapContext.Provider value={markersMap}>
+          <MarkersMapContext.Provider value={markersMapRef}>
             <div className={styles["maps-map"]} />
             <>
               {Array.from(vehicleMap).map(([vehicleId, vehicle]) => {
@@ -488,7 +499,6 @@ function Maps() {
                     key={vehicleId}
                     onClick={() => {
                       if (!map || !tripMap || !shapesMap || !routeMap) return;
-
                       const trip_id = vehicle.trip.trip_id;
                       const trip = tripMap.get(trip_id);
                       if (!trip) return;

@@ -249,6 +249,7 @@ export enum RouteId {
 export enum ZIndexLayer {
   POLYLINE,
   POLYLINE_SELECTED,
+  MARKER_STALE,
   MARKER,
 }
 
