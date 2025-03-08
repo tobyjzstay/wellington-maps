@@ -1,8 +1,6 @@
 "use server";
 
-import { Cache, cacheRequest } from "../util";
-
-const feed_info: Cache<FeedInfo> = Object.create(null);
+import { fetchMetlink } from "../util";
 
 export type FeedInfo = {
   id: number;
@@ -14,25 +12,6 @@ export type FeedInfo = {
   feed_version: string;
 };
 
-export async function GET(request: Request) {
-  if (!process.env.METLINK_API_KEY) return new Response(null, { status: 503 });
-
-  await cacheRequest(
-    feed_info,
-    "https://api.opendata.metlink.org.nz/v1/gtfs/feed_info",
-    86400,
-    (response): Promise<FeedInfo[]> => {
-      return response.json();
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.METLINK_API_KEY,
-      },
-    }
-  );
-
-  const headers = new Headers(request.headers);
-  headers.set("Content-Type", "application/json");
-  return new Response(feed_info.body, { headers });
+export async function GET(_request: Request) {
+  return fetchMetlink("/gtfs/feed_info", 86400);
 }

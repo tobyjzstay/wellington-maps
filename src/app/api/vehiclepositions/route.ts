@@ -43,7 +43,5 @@ type Position = {
 };
 
 export async function GET() {
-  return fetchMetlink("/gtfs-rt/vehiclepositions", {
-    revalidate: 5, // seconds
-  });
+  return fetchMetlink("/gtfs-rt/vehiclepositions", 5000);
 }

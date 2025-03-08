@@ -1,6 +1,6 @@
 "use server";
 
-import { Cache, cacheRequest } from "../util";
+import { Cache, fetchMetlink } from "../util";
 
 const trips: Cache<Trip> = Object.create(null);
 
@@ -18,24 +18,5 @@ export type Trip = {
 };
 
 export async function GET(request: Request) {
-  if (!process.env.METLINK_API_KEY) return new Response(null, { status: 503 });
-
-  await cacheRequest(
-    trips,
-    "https://api.opendata.metlink.org.nz/v1/gtfs/trips",
-    86400,
-    (response): Promise<Trip[]> => {
-      return response.json();
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.METLINK_API_KEY,
-      },
-    }
-  );
-
-  const headers = new Headers(request.headers);
-  headers.set("Content-Type", "application/json");
-  return new Response(trips.body, { headers });
+  return fetchMetlink("/gtfs/trips", 86400);
 }

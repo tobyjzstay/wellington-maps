@@ -1,8 +1,6 @@
 "use server";
 
-import { Cache, cacheRequest } from "../util";
-
-const stops: Cache<Stop> = Object.create(null);
+import { fetchMetlink } from "../util";
 
 export type Stop = {
   id: number;
@@ -19,25 +17,6 @@ export type Stop = {
   stop_timezone: string;
 };
 
-export async function GET(request: Request) {
-  if (!process.env.METLINK_API_KEY) return new Response(null, { status: 503 });
-
-  await cacheRequest(
-    stops,
-    "https://api.opendata.metlink.org.nz/v1/gtfs/stops",
-    86400,
-    (response): Promise<Stop[]> => {
-      return response.json();
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.METLINK_API_KEY,
-      },
-    }
-  );
-
-  const headers = new Headers(request.headers);
-  headers.set("Content-Type", "application/json");
-  return new Response(stops.body, { headers });
+export async function GET(_request: Request) {
+  return fetchMetlink("/gtfs/stops", 86400);
 }

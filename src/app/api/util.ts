@@ -1,6 +1,7 @@
 "use server";
 
 import JSZip from "jszip";
+import cache from "memory-cache";
 import { Agency } from "./agency/route";
 import { Calendar } from "./calendar/route";
 import { CalendarDate } from "./calendar_dates/route";
@@ -11,20 +12,48 @@ import { Stop } from "./stops/route";
 import { Transfer } from "./transfers/route";
 import { Trip } from "./trips/route";
 
-export async function fetchMetlink(
-  path: string,
-  next?: NextFetchRequestConfig
-) {
-  if (!process.env.METLINK_API_KEY) return new Response(null, { status: 503 });
+export async function fetchMetlink(path: string, revalidate: number) {
+  if (!process.env.METLINK_API_KEY) {
+    console.error(getTimestamp(), "No Metlink API key provided");
+    return new Response(null, { status: 503 });
+  }
 
-  return await fetch("https://api.opendata.metlink.org.nz/v1" + path, {
+  const input = "https://api.opendata.metlink.org.nz/v1" + path;
+
+  const cachedData = cache.get(input);
+  if (cachedData)
+    return new Response(cachedData.body, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+  const method = "GET";
+  const response = await fetch(input, {
+    cache: "no-cache",
     headers: {
       "Content-Type": "application/json",
       "x-api-key": process.env.METLINK_API_KEY,
     },
-    next,
+    method,
   });
+  console.debug(getTimestamp(), method, response.status, input);
+
+  try {
+    const json = await response.json();
+    const body = JSON.stringify(json, null, 2);
+    cache.put(input, { body }, revalidate);
+    return new Response(body, {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error(getTimestamp(), "Failed to fetch Metlink data:");
+    console.error(error);
+  }
+
+  return new Response(null, { status: 503 });
 }
+
 export type Cache<T> = {
   body: string;
   data: T | T[];
@@ -222,20 +251,30 @@ export async function cacheRequest<T>(
   handleResponse: (response: Response) => Promise<T | T[]>,
   init?: RequestInit | undefined
 ) {
-  const timestamp = new Date().getTime();
+  const date = new Date();
+  const timestamp = date.getTime();
 
   if (!cache.timestamp || timestamp - cache.timestamp >= revalidate * 1000) {
-    console.info("Cache expired or empty. Fetching new data...");
     const response = await fetch(input, { ...init, cache: "no-cache" });
 
-    if (!response.ok) {
-      console.error(`Failed to fetch ${input}:`, response.statusText);
-      return;
-    }
+    if (!response.ok) return;
 
     const data = await handleResponse(response);
     cache.timestamp = timestamp;
     cache.data = data;
     cache.body = JSON.stringify(data, null, 2);
   }
+}
+
+function getTimestamp() {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+
+  return `[${year}-${month}-${day} ${hours}:${minutes}:${seconds}]`;
 }
