@@ -101,6 +101,7 @@ function Maps() {
   React.useEffect(() => {
     Promise.all([getRouteMap(), getShapeMap(), getTripMap()]).then(
       ([routes, shapes, trips]) => {
+        // TODO: handle null
         setRouteMap(routes);
         setShapesMap(shapes);
         setTripMap(trips);
@@ -305,30 +306,32 @@ function Maps() {
 
     async function update() {
       const response = await fetch("/api/vehiclepositions");
-      const vehiclepositions: VehiclePositions = await response.json();
+      try {
+        const vehiclepositions: VehiclePositions = await response.json();
 
-      // TODO: fix triggering twice
-      setVehicleMap((prevVehicleMap) => {
-        const updatedVehicleIds = new Set<string>();
-        const newVehicleMap = new Map(prevVehicleMap);
-        vehiclepositions.entity.forEach((entity) => {
-          const { vehicle } = entity;
-          const vehicleId = vehicle.vehicle.id;
-          newVehicleMap.set(vehicleId, vehicle);
-          updatedVehicleIds.add(vehicleId);
-        });
-        prevVehicleMap.forEach((_, vehicleId) => {
-          if (!updatedVehicleIds.has(vehicleId)) {
-            newVehicleMap.delete(vehicleId);
-            const markers = markersMapRef.current.get(vehicleId);
-            if (markers) {
-              markers.forEach((marker) => (marker.map = null));
-              markersMapRef.current.delete(vehicleId);
+        // TODO: fix triggering twice
+        setVehicleMap((prevVehicleMap) => {
+          const updatedVehicleIds = new Set<string>();
+          const newVehicleMap = new Map(prevVehicleMap);
+          vehiclepositions.entity.forEach((entity) => {
+            const { vehicle } = entity;
+            const vehicleId = vehicle.vehicle.id;
+            newVehicleMap.set(vehicleId, vehicle);
+            updatedVehicleIds.add(vehicleId);
+          });
+          prevVehicleMap.forEach((_, vehicleId) => {
+            if (!updatedVehicleIds.has(vehicleId)) {
+              newVehicleMap.delete(vehicleId);
+              const markers = markersMapRef.current.get(vehicleId);
+              if (markers) {
+                markers.forEach((marker) => (marker.map = null));
+                markersMapRef.current.delete(vehicleId);
+              }
             }
-          }
+          });
+          return newVehicleMap;
         });
-        return newVehicleMap;
-      });
+      } catch (error) {}
     }
   }, [routeMap, shapesMap, tripMap, getVisibility]);
 

@@ -438,38 +438,50 @@ export function getRouteTypeSvg(route_type: RouteType): string {
 export async function getRouteMap() {
   const response = await fetch("/api/routes");
   if (!response.ok) return null;
-  const routes: Route[] = await response.json();
-  const routeMap = new Map<number, Route>();
-  for (const route of routes) {
-    const route_id = parseInt(route.route_id);
-    routeMap.set(route_id, route);
+  try {
+    const routes: Route[] = await response.json();
+    const routeMap = new Map<number, Route>();
+    for (const route of routes) {
+      const route_id = parseInt(route.route_id);
+      routeMap.set(route_id, route);
+    }
+    return routeMap;
+  } catch (error) {
+    return null;
   }
-  return routeMap;
 }
 
 export async function getShapeMap() {
   const response = await fetch("/api/shapes");
   if (!response.ok) return null;
-  const shapes: Shape[] = await response.json();
-  const shapeMap = new Map<string, Shape[]>();
-  for (let i = 0; i < shapes.length; i++) {
-    const shape = shapes[i];
-    const { shape_id } = shape;
-    if (!shapeMap.has(shape_id)) shapeMap.set(shape_id, []);
-    shapeMap.get(shape_id)!.push(shape);
+  try {
+    const shapes: Shape[] = await response.json();
+    const shapeMap = new Map<string, Shape[]>();
+    for (let i = 0; i < shapes.length; i++) {
+      const shape = shapes[i];
+      const { shape_id } = shape;
+      if (!shapeMap.has(shape_id)) shapeMap.set(shape_id, []);
+      shapeMap.get(shape_id)!.push(shape);
+    }
+    return shapeMap;
+  } catch (error) {
+    return null;
   }
-  return shapeMap;
 }
 
 export async function getTripMap() {
   const response = await fetch("/api/trips");
   if (!response.ok) return null;
-  const trips: Trip[] = await response.json();
-  const tripMap = new Map<string, Trip>();
-  for (const trip of trips) {
-    tripMap.set(trip.trip_id, trip);
+  try {
+    const trips: Trip[] = await response.json();
+    const tripMap = new Map<string, Trip>();
+    for (const trip of trips) {
+      tripMap.set(trip.trip_id, trip);
+    }
+    return tripMap;
+  } catch (error) {
+    return null;
   }
-  return tripMap;
 }
 
 export function getZIndex(id: number, layer: ZIndexLayer) {
