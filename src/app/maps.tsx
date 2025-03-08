@@ -55,7 +55,6 @@ function Maps() {
       center: CENTER,
       clickableIcons: false,
       disableDefaultUI: true,
-      isFractionalZoomEnabled: true,
       mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       scaleControl: true,
