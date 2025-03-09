@@ -447,6 +447,7 @@ export async function getRouteMap() {
     }
     return routeMap;
   } catch (error) {
+    console.error("Unable to parse routes.", error);
     return null;
   }
 }
@@ -465,6 +466,7 @@ export async function getShapeMap() {
     }
     return shapeMap;
   } catch (error) {
+    console.error("Unable to parse shapes.", error);
     return null;
   }
 }
@@ -480,6 +482,7 @@ export async function getTripMap() {
     }
     return tripMap;
   } catch (error) {
+    console.error("Unable to parse trips.", error);
     return null;
   }
 }

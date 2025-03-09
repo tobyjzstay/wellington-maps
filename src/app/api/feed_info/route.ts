@@ -1,6 +1,6 @@
 "use server";
 
-import { fetchMetlink } from "../util";
+import { getMetlinkData } from "../util";
 
 export type FeedInfo = {
   id: number;
@@ -12,6 +12,6 @@ export type FeedInfo = {
   feed_version: string;
 };
 
-export async function GET(_request: Request) {
-  return fetchMetlink("/gtfs/feed_info", 86400);
+export async function GET(request: Request) {
+  return getMetlinkData(request);
 }

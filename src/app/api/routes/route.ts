@@ -1,7 +1,7 @@
 "use server";
 
 import { RouteId, RouteType } from "@/app/util";
-import { fetchMetlink } from "../util";
+import { getMetlinkData } from "../util";
 
 export type Route = {
   id: number;
@@ -16,6 +16,6 @@ export type Route = {
   route_url: string;
 };
 
-export async function GET(_request: Request) {
-  return fetchMetlink("/gtfs/routes", 86400);
+export async function GET(request: Request) {
+  return getMetlinkData(request);
 }

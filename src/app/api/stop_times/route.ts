@@ -1,8 +1,8 @@
 "use server";
 
-import { fetchMetlink } from "../util";
+import { getMetlinkData } from "../util";
 
-type StopTime = {
+export type StopTime = {
   id: number;
   trip_id: string;
   arrival_time: string;
@@ -16,6 +16,6 @@ type StopTime = {
   timepoint: string;
 };
 
-export async function GET(_request: Request) {
-  return fetchMetlink("/gtfs/stop_times", 86400);
+export async function GET(request: Request) {
+  return getMetlinkData(request);
 }

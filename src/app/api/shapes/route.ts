@@ -1,6 +1,6 @@
 "use server";
 
-import { fetchMetlinkFull } from "../util";
+import { getMetlinkData } from "../util";
 
 export type Shape = {
   id: number;
@@ -12,12 +12,5 @@ export type Shape = {
 };
 
 export async function GET(request: Request) {
-  const full = await fetchMetlinkFull();
-  if (!full) return new Response(null, { status: 503 });
-  const { shapes } = full;
-
-  const headers = new Headers(request.headers);
-  headers.set("Content-Type", "application/json");
-
-  return new Response(JSON.stringify(shapes, null, 2), { headers });
+  return getMetlinkData(request);
 }

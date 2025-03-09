@@ -1,6 +1,6 @@
 "use server";
 
-import { fetchMetlink } from "../util";
+import { getMetlinkData } from "../util";
 
 export type Agency = {
   id: number;
@@ -13,6 +13,6 @@ export type Agency = {
   agency_fare_url: string;
 };
 
-export async function GET(_request: Request) {
-  fetchMetlink("/gtfs/agency", 86400);
+export async function GET(request: Request) {
+  return getMetlinkData(request);
 }

@@ -2,67 +2,22 @@
 
 import JSZip from "jszip";
 import cache from "memory-cache";
+import { promisify } from "util";
+import zlib from "zlib";
 import { Agency } from "./agency/route";
 import { Calendar } from "./calendar/route";
 import { CalendarDate } from "./calendar_dates/route";
 import { FeedInfo } from "./feed_info/route";
 import { Route } from "./routes/route";
 import { Shape } from "./shapes/route";
+import { StopTime } from "./stop_times/route";
 import { Stop } from "./stops/route";
 import { Transfer } from "./transfers/route";
 import { Trip } from "./trips/route";
 
-export async function fetchMetlink(path: string, revalidate: number) {
-  if (!process.env.METLINK_API_KEY) {
-    console.error(getTimestamp(), "No Metlink API key provided");
-    return new Response(null, { status: 503 });
-  }
+const gzip = promisify(zlib.gzip);
 
-  const input = "https://api.opendata.metlink.org.nz/v1" + path;
-
-  const cachedData = cache.get(input);
-  if (cachedData)
-    return new Response(cachedData.body, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-  const method = "GET";
-  const response = await fetch(input, {
-    cache: "no-cache",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.METLINK_API_KEY,
-    },
-    method,
-  });
-  console.debug(getTimestamp(), method, response.status, input);
-
-  try {
-    const json = await response.json();
-    const body = JSON.stringify(json, null, 2);
-    cache.put(input, { body }, revalidate);
-    return new Response(body, {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error(getTimestamp(), "Failed to fetch Metlink data:");
-    console.error(error);
-  }
-
-  return new Response(null, { status: 503 });
-}
-
-export type Cache<T> = {
-  body: string;
-  data: T | T[];
-  timestamp: number;
-};
-
-const full: Cache<Full> = Object.create(null);
-
-type Full = {
+export type Full = {
   agency: Agency[];
   calendar: Calendar[];
   calendar_dates: CalendarDate[];
@@ -71,198 +26,255 @@ type Full = {
   shapes: Shape[];
   stop_pattern_trips: any[];
   stop_patterns: any[];
-  stop_times: any[];
+  stop_times: StopTime[];
   stops: Stop[];
   transfers: Transfer[];
   trips: Trip[];
 };
 
-export async function fetchMetlinkFull() {
-  if (!process.env.METLINK_API_KEY) return null;
+const key = "full";
+const path = "https://static.opendata.metlink.org.nz/v1/gtfs/full.zip";
 
-  await cacheRequest(
-    full,
-    "https://static.opendata.metlink.org.nz/v1/gtfs/full.zip",
-    86400,
-    async (response) => {
-      const buffer = await response.arrayBuffer();
-      const zip = new JSZip();
-      await zip.loadAsync(buffer);
-      const files = zip.file(/\.txt$/);
-      for (const file of files) {
-        const text = await file.async("text");
-        let headers: string[] | null = null;
-        let name = file.name.slice(0, ".txt".length * -1) as keyof Full;
-        const data: Full[typeof name] = [];
-        for (const line of text.split("\n")) {
-          if (headers === null) {
-            headers = line.split(",");
-            continue;
-          }
-          const datum = Object.create(null);
-          const values = line.split(",");
-          for (let i = 0; i < headers.length; i++) {
-            const header = headers[i];
-            let value: any = values[i];
-            switch (name) {
-              case "agency":
-                switch (header) {
-                  case "id":
-                    value = parseInt(value);
-                    break;
-                  default:
-                    break;
-                }
-                break;
-              case "calendar":
-                switch (header) {
-                  case "id":
-                  case "monday":
-                  case "tuesday":
-                  case "wednesday":
-                  case "thursday":
-                  case "friday":
-                  case "saturday":
-                  case "sunday":
-                    value = parseInt(value);
-                    break;
-                  default:
-                    break;
-                }
-              case "calendar_dates":
-                switch (header) {
-                  case "id":
-                  case "exception_type":
-                    value = parseInt(value);
-                    break;
-                  default:
-                    break;
-                }
-                break;
-              case "feed_info":
-                switch (header) {
-                  case "id":
-                    value = parseInt(value);
-                    break;
-                  default:
-                    break;
-                }
-                break;
-              case "routes":
-                switch (header) {
-                  case "id":
-                  case "route_type":
-                    value = parseInt(value);
-                    break;
-                  default:
-                    break;
-                }
-                break;
-              case "shapes":
-                switch (header) {
-                  case "id":
-                  case "shape_pt_sequence":
-                  case "shape_dist_traveled":
-                    value = parseInt(value);
-                  case "shape_pt_lat":
-                  case "shape_pt_lon":
-                    value = parseFloat(value);
-                    break;
-                  default:
-                    break;
-                }
-                break;
-              case "stop_times":
-                switch (header) {
-                  case "id":
-                  case "stop_sequence":
-                  case "shape_dist_traveled":
-                  case "pickup_type":
-                  case "drop_off_type":
-                    value = parseInt(value);
-                    break;
-                  default:
-                    break;
-                }
-                break;
-              case "stops":
-                switch (header) {
-                  case "id":
-                  case "stop_code":
-                  case "location_type":
-                  case "parent_station":
-                    value = parseInt(value);
-                    break;
-                  case "stop_lat":
-                  case "stop_lon":
-                    value = parseFloat(value);
-                    break;
-                  default:
-                    break;
-                }
-                break;
-              case "transfers":
-                switch (header) {
-                  case "id":
-                    value = parseInt(value);
-                  default:
-                    break;
-                }
-                break;
-              case "trips":
-                switch (header) {
-                  case "id":
-                  case "route_id":
-                  case "direction_id":
-                  case "wheelchair_accessible":
-                  case "bikes_allowed":
-                    value = parseInt(value);
-                  default:
-                    break;
-                }
-                break;
-              default:
-                break;
-            }
-            datum[header] = value;
-          }
-          data.push(datum);
+let pending: Promise<Full> | null = null;
+
+export async function getMetlinkFullData(
+  fullDataKey: keyof Full
+): Promise<Buffer> {
+  if (pending) {
+    await pending;
+    return cache.get(fullDataKey);
+  }
+
+  pending = (async () => {
+    const method = "GET";
+    const response = await fetch(path, {
+      cache: "no-cache",
+      method,
+    });
+    console.info(getTimestamp(), method, response.status, path);
+
+    const buffer = await response.arrayBuffer();
+    const bufferCopy = new Uint8Array(buffer.slice(0));
+    cache.put(key, bufferCopy, 86400000);
+
+    const zip = new JSZip();
+    await zip.loadAsync(buffer);
+    const files = zip.file(/\.txt$/);
+    const fullData = Object.create(null);
+    for (const file of files) {
+      const text = await file.async("text");
+      let headers: string[] | null = null;
+      let dataKey = file.name.slice(0, ".txt".length * -1) as keyof Full;
+      const data: Full[typeof dataKey] = [];
+      for (const line of text.split("\n")) {
+        if (headers === null) {
+          headers = line.split(",");
+          continue;
         }
-        if (!full.data) full.data = Object.create(null);
-        full.data = { ...full.data, [name]: data };
+        const datum = Object.create(null);
+        const values = line.split(",");
+        for (let i = 0; i < headers.length; i++) {
+          const header = headers[i];
+          let value: any = values[i];
+          switch (dataKey) {
+            case "agency":
+              switch (header) {
+                case "id":
+                  value = parseInt(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case "calendar":
+              switch (header) {
+                case "id":
+                case "monday":
+                case "tuesday":
+                case "wednesday":
+                case "thursday":
+                case "friday":
+                case "saturday":
+                case "sunday":
+                  value = parseInt(value);
+                  break;
+                default:
+                  break;
+              }
+            case "calendar_dates":
+              switch (header) {
+                case "id":
+                case "exception_type":
+                  value = parseInt(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case "feed_info":
+              switch (header) {
+                case "id":
+                  value = parseInt(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case "routes":
+              switch (header) {
+                case "id":
+                case "route_type":
+                  value = parseInt(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case "shapes":
+              switch (header) {
+                case "id":
+                case "shape_pt_sequence":
+                case "shape_dist_traveled":
+                  value = parseInt(value);
+                case "shape_pt_lat":
+                case "shape_pt_lon":
+                  value = parseFloat(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case "stop_times":
+              switch (header) {
+                case "id":
+                case "stop_sequence":
+                case "shape_dist_traveled":
+                case "pickup_type":
+                case "drop_off_type":
+                  value = parseInt(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case "stops":
+              switch (header) {
+                case "id":
+                case "stop_code":
+                case "location_type":
+                case "parent_station":
+                  value = parseInt(value);
+                  break;
+                case "stop_lat":
+                case "stop_lon":
+                  value = parseFloat(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case "transfers":
+              switch (header) {
+                case "id":
+                  value = parseInt(value);
+                default:
+                  break;
+              }
+              break;
+            case "trips":
+              switch (header) {
+                case "id":
+                case "route_id":
+                case "direction_id":
+                case "wheelchair_accessible":
+                case "bikes_allowed":
+                  value = parseInt(value);
+                default:
+                  break;
+              }
+              break;
+            default:
+              break;
+          }
+          datum[header] = value;
+        }
+        data.push(datum);
       }
-      return full.data;
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.METLINK_API_KEY,
-      },
+      fullData[dataKey] = data;
+      const body = JSON.stringify(data);
+      const compressed = await gzip(body);
+      cache.put(dataKey, compressed, 86400000);
     }
-  );
+    return fullData as Full;
+  })();
 
-  return (full.data || {}) as Full;
+  await pending;
+  return cache.get(fullDataKey);
 }
 
-export async function cacheRequest<T>(
-  cache: Cache<T>,
-  input: string,
-  revalidate: number,
-  handleResponse: (response: Response) => Promise<T | T[]>,
-  init?: RequestInit | undefined
+export async function getMetlinkData(request: Request) {
+  const key = getKey(request.url) as keyof Full;
+  let data = cache.get(key) || (await getMetlinkFullData(key));
+  const _response = response(data);
+  console.info(getTimestamp(), request.method, _response.status, request.url);
+  return _response;
+}
+
+function getKey(urlString: string) {
+  const url = new URL(urlString);
+  const pathParts = url.pathname.split("/").filter(Boolean);
+  return pathParts[pathParts.length - 1];
+}
+
+const response = (body: BodyInit) =>
+  new Response(body, {
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Encoding": "gzip",
+    },
+  });
+
+export async function fetchMetlinkData(
+  key: string,
+  path: string,
+  revalidate: number
 ) {
-  const date = new Date();
-  const timestamp = date.getTime();
+  if (!process.env.METLINK_API_KEY) {
+    console.error(getTimestamp(), "No Metlink API key provided.");
+    return new Response(null, { status: 500 });
+  }
 
-  if (!cache.timestamp || timestamp - cache.timestamp >= revalidate * 1000) {
-    const response = await fetch(input, { ...init, cache: "no-cache" });
+  const cachedData = cache.get(key);
+  if (cachedData)
+    return new Response(cachedData.body, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
 
-    if (!response.ok) return;
+  const method = "GET";
+  const response = await fetch(path, {
+    cache: "no-cache",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.METLINK_API_KEY,
+    },
+    method,
+  });
+  console.info(getTimestamp(), method, response.status, path);
 
-    const data = await handleResponse(response);
-    cache.timestamp = timestamp;
-    cache.data = data;
-    cache.body = JSON.stringify(data, null, 2);
+  try {
+    const json = await response.json();
+    const body = JSON.stringify(json, null, 2);
+    cache.put(key, { body }, revalidate);
+    return new Response(body, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  } catch (error) {
+    console.error(getTimestamp(), "Failed to fetch Metlink data.", error);
+    return new Response(null, { status: 500 });
   }
 }
 

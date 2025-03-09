@@ -1,6 +1,6 @@
 "use server";
 
-import { fetchMetlink } from "../util";
+import { fetchMetlinkData } from "../util";
 
 export type VehiclePositions = {
   entity: Entity[];
@@ -42,6 +42,9 @@ type Position = {
   longitude: number;
 };
 
+const key = "vehiclepositions";
+const path = "https://api.opendata.metlink.org.nz/v1/gtfs-rt/vehiclepositions";
+
 export async function GET() {
-  return fetchMetlink("/gtfs-rt/vehiclepositions", 5000);
+  return fetchMetlinkData(key, path, 5000);
 }

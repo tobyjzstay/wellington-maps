@@ -1,8 +1,6 @@
 "use server";
 
-import { Cache, fetchMetlink } from "../util";
-
-const trips: Cache<Trip> = Object.create(null);
+import { getMetlinkData } from "../util";
 
 export type Trip = {
   id: number;
@@ -18,5 +16,5 @@ export type Trip = {
 };
 
 export async function GET(request: Request) {
-  return fetchMetlink("/gtfs/trips", 86400);
+  return getMetlinkData(request);
 }

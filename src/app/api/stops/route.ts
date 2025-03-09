@@ -1,6 +1,6 @@
 "use server";
 
-import { fetchMetlink } from "../util";
+import { getMetlinkData } from "../util";
 
 export type Stop = {
   id: number;
@@ -17,6 +17,6 @@ export type Stop = {
   stop_timezone: string;
 };
 
-export async function GET(_request: Request) {
-  return fetchMetlink("/gtfs/stops", 86400);
+export async function GET(request: Request) {
+  return getMetlinkData(request);
 }

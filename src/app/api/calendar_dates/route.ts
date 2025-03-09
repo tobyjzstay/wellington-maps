@@ -1,6 +1,6 @@
 "use server";
 
-import { fetchMetlink } from "../util";
+import { getMetlinkData } from "../util";
 
 export type CalendarDate = {
   id: number;
@@ -9,6 +9,6 @@ export type CalendarDate = {
   exception_type: number;
 };
 
-export async function GET(_request: Request) {
-  fetchMetlink("/gtfs/calendar_dates", 86400);
+export async function GET(request: Request) {
+  return getMetlinkData(request);
 }
