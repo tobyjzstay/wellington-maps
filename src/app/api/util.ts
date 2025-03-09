@@ -65,6 +65,7 @@ export async function getMetlinkFullData(
       const text = await file.async("text");
       let headers: string[] | null = null;
       let dataKey = file.name.slice(0, ".txt".length * -1) as keyof Full;
+      if (dataKey === "routes") continue; // TODO: parse routes correctly
       const data: Full[typeof dataKey] = [];
       for (const line of text.split("\n")) {
         if (headers === null) {
@@ -120,16 +121,16 @@ export async function getMetlinkFullData(
                   break;
               }
               break;
-            case "routes":
-              switch (header) {
-                case "id":
-                case "route_type":
-                  value = parseInt(value);
-                  break;
-                default:
-                  break;
-              }
-              break;
+            // case "routes":
+            //   switch (header) {
+            //     case "id":
+            //     case "route_type":
+            //       value = parseInt(value);
+            //       break;
+            //     default:
+            //       break;
+            //   }
+            //   break;
             case "shapes":
               switch (header) {
                 case "id":

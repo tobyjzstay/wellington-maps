@@ -406,13 +406,13 @@ export function getRouteColors(route: Route) {
 export function getRouteTypeColor(route_type: RouteType) {
   switch (route_type) {
     case RouteType.RAIL:
-    case RouteType.CABLE_CAR:
       return "#784e90";
     case RouteType.BUS:
-    case RouteType.SCHOOL_BUS:
       return "#4e801f";
     case RouteType.FERRY:
       return "#0093b2";
+    case RouteType.CABLE_CAR:
+    case RouteType.SCHOOL_BUS:
     default:
       return null;
   }
