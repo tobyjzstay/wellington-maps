@@ -151,7 +151,6 @@ function Maps() {
       midnight,
     ]
   );
-  const [polylinesCounter, setPolylinesCounter] = React.useState(0);
   const busRoutePolylinesRef = React.useRef<
     Map<BusRouteType, google.maps.Polyline[]>
   >(new Map());
@@ -163,124 +162,156 @@ function Maps() {
     if (!map || !routeMap || !shapesMap || !tripMap) return;
     const drawnShapeIds: string[] = [];
 
-    [busRoutePolylinesRef, routePolylinesRef].forEach((polylinesRef) => {
-      polylinesRef.current.forEach((polylines) =>
-        polylines.forEach((polyline) => polyline.setMap(null))
-      );
-      polylinesRef.current.clear();
-    });
+    const strokeWeight = (index: number) => {
+      return Math.pow(1.2, zoom - ZOOM) + index;
+    };
 
-    tripMap.forEach((trip) => {
-      const { id, route_id: trip_route_id, shape_id } = trip;
-      if (drawnShapeIds.includes(shape_id)) return;
-      const route = routeMap.get(trip_route_id);
-      if (!route) {
-        console.warn("Route not found:", trip_route_id);
-        return;
-      }
-      const { route_id, route_type } = route;
-      const shapes = shapesMap.get(shape_id);
-      if (!shapes) return;
-      const { polylineColor } = getRouteColors(route);
-      let path = shapes.map((shape) => ({
-        lat: shape.shape_pt_lat,
-        lng: shape.shape_pt_lon,
-      }));
+    if (busRoutePolylinesRef.current.size !== 0)
+      [busRoutePolylinesRef, routePolylinesRef].forEach((polylinesRef) => {
+        polylinesRef.current.forEach((polylines) => {
+          polylines.forEach((polyline, index) => {
+            const trip_id = (polyline as any).id;
+            const trip = tripMap.get(trip_id);
+            const { route_id: trip_route_id, shape_id } = trip!;
+            const route = routeMap.get(trip_route_id);
+            const { route_id, route_type } = route!;
+            const busRouteType = getBusRouteType(route_id);
+            const shapes = shapesMap.get(shape_id);
+            const visible = getVisibility(route_type, busRouteType);
+            if (!shapes) {
+              if (process.env.NODE_ENV === "development")
+                console.warn("Shape not found:", shape_id);
+              return;
+            }
 
-      const tolerance = 0.0001 * Math.pow(2, 12 - zoom);
-      const simplifiedPoints = simplify(
-        path.map((point) => ({ x: point.lng, y: point.lat })),
-        tolerance,
-        true
-      );
-      const simplifiedPath = simplifiedPoints.map((point) => ({
-        lat: point.y,
-        lng: point.x,
-      }));
+            const path = shapes.map((shape) => ({
+              lat: shape.shape_pt_lat,
+              lng: shape.shape_pt_lon,
+            }));
+            const tolerance = 0.0001 * Math.pow(2, ZOOM - zoom);
+            const simplifiedPoints = simplify(
+              path.map((point) => ({ x: point.lng, y: point.lat })),
+              tolerance,
+              true
+            );
+            const simplifiedPath = simplifiedPoints.map((point) => ({
+              lat: point.y,
+              lng: point.x,
+            }));
 
-      const bounds = new google.maps.LatLngBounds();
-      simplifiedPath.forEach((point) => bounds.extend(point));
-      const onClick = () => {
-        const zIndex = getZIndex(id, ZIndexLayer.POLYLINE_SELECTED);
-        const outline = new google.maps.Polyline({
-          path,
-          strokeColor: "#ffffff",
-          strokeWeight: 9,
+            polyline.setOptions({
+              path: simplifiedPath,
+              strokeWeight: strokeWeight(index % 2),
+              visible,
+            });
+          });
+        });
+      });
+    else
+      tripMap.forEach((trip) => {
+        const { trip_id, route_id: trip_route_id, shape_id } = trip;
+
+        if (drawnShapeIds.includes(shape_id)) return;
+        else drawnShapeIds.push(shape_id);
+
+        const route = routeMap.get(trip_route_id);
+        if (!route) {
+          if (process.env.NODE_ENV === "development")
+            console.warn("Route not found:", trip_route_id);
+          return;
+        }
+
+        const { route_id, route_type } = route;
+        const shapes = shapesMap.get(shape_id);
+        if (!shapes) {
+          if (process.env.NODE_ENV === "development")
+            console.warn("Shape not found:", shape_id);
+          return;
+        }
+
+        const path = shapes.map((shape) => ({
+          lat: shape.shape_pt_lat,
+          lng: shape.shape_pt_lon,
+        }));
+        const tolerance = 0.0001 * Math.pow(2, ZOOM - zoom);
+        const simplifiedPoints = simplify(
+          path.map((point) => ({ x: point.lng, y: point.lat })),
+          tolerance,
+          true
+        );
+        const simplifiedPath = simplifiedPoints.map((point) => ({
+          lat: point.y,
+          lng: point.x,
+        }));
+        const bounds = new google.maps.LatLngBounds();
+        path.forEach((point) => bounds.extend(point));
+
+        const id = routeIdValues.indexOf(route_id);
+        const zIndex = getZIndex(id, ZIndexLayer.POLYLINE);
+        const busRouteType = getBusRouteType(route_id);
+        if (route_type === RouteType.BUS && busRouteType === null) {
+          if (process.env.NODE_ENV === "development")
+            console.warn("Bus route type not found:", route_id);
+          return;
+        }
+        const strokeColor = "#ffffff";
+        const strokeWeight = 2 * Math.pow(1.2, zoom - ZOOM);
+        const { polylineColor } = getRouteColors(route);
+        const visible = getVisibility(route_type, busRouteType);
+        const onClick = () => {
+          const zIndex = getZIndex(id, ZIndexLayer.POLYLINE_SELECTED);
+          const fill = new google.maps.Polyline({
+            path,
+            strokeColor: polylineColor,
+            strokeWeight: strokeWeight * 3,
+            zIndex,
+          });
+          const stroke = new google.maps.Polyline({
+            path,
+            strokeColor,
+            strokeWeight: strokeWeight * 1.5 * 3,
+            zIndex: zIndex - 1,
+          });
+          setSelectedPolylines([fill, stroke]);
+          map.fitBounds(bounds);
+        };
+
+        const fill = new google.maps.Polyline({
+          map,
+          path: simplifiedPath,
+          strokeColor: polylineColor,
+          strokeWeight,
+          visible,
+          zIndex,
+        });
+        const stroke = new google.maps.Polyline({
+          map,
+          path: simplifiedPath,
+          strokeColor,
+          strokeWeight: strokeWeight * 1.5,
+          visible,
           zIndex: zIndex - 1,
         });
-        const fill = new google.maps.Polyline({
-          path,
-          strokeColor: polylineColor,
-          strokeWeight: 6,
-          zIndex: zIndex,
-        });
-        setSelectedPolylines([outline, fill]);
-        map.fitBounds(bounds);
-      };
-      const zIndex = getZIndex(
-        routeIdValues.indexOf(route_id),
-        ZIndexLayer.POLYLINE
-      );
-      const busRouteType = getBusRouteType(route_id);
-      if (route_type === RouteType.BUS && busRouteType === null) {
-        console.warn("Bus route type not found:", route_id);
-        return;
-      }
-      const outline = new google.maps.Polyline({
-        path: simplifiedPath,
-        strokeColor: "#ffffff",
-        strokeWeight: 3,
-        visible: getVisibility(route_type, busRouteType),
-        zIndex: zIndex - 1,
-      });
-      outline.addListener("click", onClick);
-      const fill = new google.maps.Polyline({
-        path: simplifiedPath,
-        strokeColor: polylineColor,
-        strokeWeight: 2,
-        visible: getVisibility(route_type, busRouteType),
-        zIndex: zIndex,
-      });
-      fill.addListener("click", onClick);
+        (stroke as any).id = trip_id;
+        (fill as any).id = trip_id;
+        const polylines = [fill, stroke];
+        polylines.forEach((polyline) => polyline.addListener("click", onClick));
 
-      drawnShapeIds.push(shape_id);
-
-      if (route_type === RouteType.BUS) {
-        if (!busRoutePolylinesRef.current.has(busRouteType!))
-          busRoutePolylinesRef.current.set(busRouteType!, []);
-        const busRoutePolylines = busRoutePolylinesRef.current.get(
-          busRouteType!
-        );
-        if (!busRoutePolylines) {
-          console.warn("Bus route polylines not found:", busRouteType);
-          return;
+        if (route_type === RouteType.BUS) {
+          const busRoutePolylines =
+            busRoutePolylinesRef.current.get(busRouteType!) ??
+            busRoutePolylinesRef.current
+              .set(busRouteType!, [])
+              .get(busRouteType!)!;
+          busRoutePolylines.push(stroke, fill);
+        } else {
+          const routePolylines =
+            routePolylinesRef.current.get(route_type) ??
+            routePolylinesRef.current.set(route_type, []).get(route_type)!;
+          routePolylines.push(stroke, fill);
         }
-        busRoutePolylines.push(outline, fill);
-      } else {
-        if (!routePolylinesRef.current.has(route_type))
-          routePolylinesRef.current.set(route_type, []);
-        const routePolylines = routePolylinesRef.current.get(route_type);
-        if (!routePolylines) {
-          console.warn("Route polylines not found:", route_type);
-          return;
-        }
-        routePolylines.push(outline, fill);
-      }
-    });
-    setPolylinesCounter((prev) => prev + 1);
+      });
   }, [getVisibility, map, routeMap, shapesMap, tripMap, zoom]);
-
-  React.useEffect(() => {
-    if (!map) return;
-    routePolylinesRef.current.forEach((polylines, routeType) => {
-      const isVisible = getVisibility(routeType);
-      polylines.forEach((polyline) => polyline.setMap(isVisible ? map : null));
-    });
-    busRoutePolylinesRef.current.forEach((polylines, routeType) => {
-      const isVisible = getVisibility(RouteType.BUS, routeType);
-      polylines.forEach((polyline) => polyline.setMap(isVisible ? map : null));
-    });
-  }, [getVisibility, map, polylinesCounter]);
 
   React.useEffect(() => {
     if (!map) return;
