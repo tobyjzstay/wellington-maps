@@ -394,7 +394,9 @@ export function getRouteColors(route: Route) {
       colors.textColor = "#ffffff";
       break;
     case RouteType.CABLE_CAR:
+      colors.typeColor = "#" + route_color;
     case RouteType.SCHOOL_BUS:
+      colors.typeColor = "#" + route_color;
       break;
     default:
       break;
