@@ -27,7 +27,7 @@ export function Point({
   vehicleType: boolean;
   visible: boolean;
 }) {
-  const map = React.useContext(MapContext);
+  const { map } = React.useContext(MapContext);
   const markersMap = React.useContext(MarkersMapContext);
 
   const markerRef =

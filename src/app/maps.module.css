@@ -1,7 +1,7 @@
 .maps-container {
-  display: flex;
-  width: 100vw;
   height: 100vh;
+  position: relative;
+  width: 100vw;
 }
 
 .maps-map > div {
@@ -16,28 +16,4 @@
   flex-grow: 1;
   position: relative;
   height: 100%;
-}
-
-.maps-drawer {
-  display: flex;
-  flex-direction: column;
-  width: 300px;
-  height: 100%;
-}
-
-.maps-drawer-options {
-  width: 300px;
-  flex-grow: 1;
-  padding: 8px;
-  box-sizing: border-box;
-}
-
-.maps-drawer-options-bus {
-  display: flex;
-  flex-direction: column;
-  margin-left: 24px;
-}
-
-.maps-drawer-options-other {
-  margin-top: auto;
 }

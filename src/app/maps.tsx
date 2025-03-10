@@ -1,16 +1,6 @@
 // @refresh reset
 "use client";
 
-import {
-  Box,
-  Checkbox,
-  Divider,
-  Drawer,
-  FormControlLabel,
-  FormGroup,
-  Toolbar,
-  Typography,
-} from "@mui/material";
 import { GoogleMap } from "@react-google-maps/api";
 import React from "react";
 import simplify from "simplify-js";
@@ -18,6 +8,7 @@ import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Trip } from "./api/trips/route";
 import { Vehicle, VehiclePositions } from "./api/vehiclepositions/route";
+import { Filters } from "./filters";
 import styles from "./maps.module.css";
 import { Point } from "./point";
 import {
@@ -33,12 +24,20 @@ import {
   ZIndexLayer,
 } from "./util";
 
-const CENTER = { lat: -41.2529601, lng: 174.7542577 };
+const CENTER = { lat: -41.25, lng: 174.85 };
 const UPDATE_INTERVAL = 5000;
 const ZOOM = 12;
 const ZOOM_DEBOUNCE = 1000;
 
-export const MapContext = React.createContext<google.maps.Map | null>(null);
+export const MapContext = React.createContext<{
+  map: google.maps.Map | null;
+  getVisibility: (
+    routeType: RouteType,
+    busRouteType?: BusRouteType | null
+  ) => boolean;
+  setVisibility: React.Dispatch<React.SetStateAction<Filters>>;
+  visibility: Filters;
+}>(Object.create(null));
 export const MarkersMapContext = React.createContext<React.MutableRefObject<
   Map<string, google.maps.marker.AdvancedMarkerElement[]>
 > | null>(null);
@@ -112,27 +111,30 @@ function Maps() {
     new Map()
   );
 
-  const [rail, setRail] = React.useState(true);
-  const [frequent, setFrequent] = React.useState(true);
-  const [standard, setStandard] = React.useState(true);
-  const [peakExpressExtended, setPeakExpressExtended] = React.useState(true);
-  const [midnight, setMidnight] = React.useState(false);
-  const [ferry, setFerry] = React.useState(true);
-  const [cableCar, setCableCar] = React.useState(true);
-  const [schoolBus, setSchoolBus] = React.useState(false);
+  const [visibility, setVisibility] = React.useState<Filters>({
+    rail: true,
+    frequent: true,
+    standard: true,
+    peakExpressExtended: true,
+    midnight: false,
+    ferry: true,
+    cableCar: true,
+    schoolBus: false,
+    vehicleType: false,
+  });
 
   const getVisibility = React.useCallback(
     (routeType: RouteType, busRouteType?: BusRouteType | null) => {
       const visibilityMap = {
-        [RouteType.RAIL]: rail,
-        [RouteType.FERRY]: ferry,
-        [RouteType.CABLE_CAR]: cableCar,
-        [RouteType.SCHOOL_BUS]: schoolBus,
+        [RouteType.RAIL]: visibility.rail,
+        [RouteType.FERRY]: visibility.ferry,
+        [RouteType.CABLE_CAR]: visibility.cableCar,
+        [RouteType.SCHOOL_BUS]: visibility.schoolBus,
         [RouteType.BUS]: {
-          [BusRouteType.FREQUENT]: frequent,
-          [BusRouteType.STANDARD]: standard,
-          [BusRouteType.PEAK_EXPRESS_EXTENDED]: peakExpressExtended,
-          [BusRouteType.MIDNIGHT]: midnight,
+          [BusRouteType.FREQUENT]: visibility.frequent,
+          [BusRouteType.STANDARD]: visibility.standard,
+          [BusRouteType.PEAK_EXPRESS_EXTENDED]: visibility.peakExpressExtended,
+          [BusRouteType.MIDNIGHT]: visibility.midnight,
         },
       };
 
@@ -140,17 +142,9 @@ function Maps() {
         ? visibilityMap[RouteType.BUS][busRouteType!] ?? false
         : visibilityMap[routeType] ?? false;
     },
-    [
-      rail,
-      ferry,
-      cableCar,
-      schoolBus,
-      frequent,
-      standard,
-      peakExpressExtended,
-      midnight,
-    ]
+    [visibility]
   );
+
   const busRoutePolylinesRef = React.useRef<
     Map<BusRouteType, google.maps.Polyline[]>
   >(new Map());
@@ -369,156 +363,10 @@ function Maps() {
 
   return (
     <div className={styles["maps-container"]}>
-      <Drawer
-        anchor="left"
-        className={styles["maps-drawer"]}
-        variant="permanent"
+      <MapContext.Provider
+        value={{ map, getVisibility, setVisibility, visibility }}
       >
-        <Toolbar>
-          <Typography variant="h6" noWrap>
-            Wellington Maps
-          </Typography>
-        </Toolbar>
-        <Divider />
-        <FormGroup className={styles["maps-drawer-options"]}>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={rail}
-                onChange={() => setRail(!rail)}
-                size="small"
-              />
-            }
-            label="Rail"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={
-                  frequent &&
-                  standard &&
-                  peakExpressExtended &&
-                  midnight &&
-                  schoolBus
-                }
-                indeterminate={
-                  (frequent ||
-                    standard ||
-                    peakExpressExtended ||
-                    midnight ||
-                    schoolBus) &&
-                  !(
-                    frequent &&
-                    standard &&
-                    peakExpressExtended &&
-                    midnight &&
-                    schoolBus
-                  )
-                }
-                onChange={() => {
-                  const state =
-                    frequent ||
-                    standard ||
-                    peakExpressExtended ||
-                    midnight ||
-                    schoolBus;
-                  setFrequent(!state);
-                  setStandard(!state);
-                  setPeakExpressExtended(!state);
-                  setMidnight(!state);
-                  setSchoolBus(!state);
-                }}
-                size="small"
-              />
-            }
-            label="Bus"
-          />
-          <Box className={styles["maps-drawer-options-bus"]}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={frequent}
-                  onChange={() => setFrequent(!frequent)}
-                  size="small"
-                />
-              }
-              label="Frequent"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={standard}
-                  onChange={() => setStandard(!standard)}
-                  size="small"
-                />
-              }
-              label="Standard"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={peakExpressExtended}
-                  onChange={() => setPeakExpressExtended(!peakExpressExtended)}
-                  size="small"
-                />
-              }
-              label="Peak, Express, Extended"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={midnight}
-                  onChange={() => setMidnight(!midnight)}
-                  size="small"
-                />
-              }
-              label="Midnight"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={schoolBus}
-                  onChange={() => setSchoolBus(!schoolBus)}
-                  size="small"
-                />
-              }
-              label="School"
-            />
-          </Box>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={ferry}
-                onChange={() => setFerry(!ferry)}
-                size="small"
-              />
-            }
-            label="Ferry"
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={cableCar}
-                onChange={() => setCableCar(!cableCar)}
-                size="small"
-              />
-            }
-            label="Cable Car"
-          />
-          <FormControlLabel
-            className={styles["maps-drawer-options-other"]}
-            control={
-              <Checkbox
-                checked={vehicleType}
-                onChange={() => setVehicleType(!vehicleType)}
-                size="small"
-              />
-            }
-            label="Vehicle Type"
-          />
-        </FormGroup>
-      </Drawer>
-      <MapContext.Provider value={map}>
+        <Filters />
         <MarkersMapContext.Provider value={markersMapRef}>
           <div className={styles["maps-map"]}>
             <GoogleMap onLoad={onMapLoad}>
