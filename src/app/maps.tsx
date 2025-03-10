@@ -163,7 +163,7 @@ function Maps() {
     const drawnShapeIds: string[] = [];
 
     const strokeWeight = (index: number) => {
-      return Math.pow(1.2, zoom - ZOOM) + index;
+      return 2 * Math.pow(1.2, zoom - ZOOM) * (1 + 0.5 * index);
     };
 
     if (busRoutePolylinesRef.current.size !== 0)
@@ -280,6 +280,7 @@ function Maps() {
           map,
           path: simplifiedPath,
           strokeColor: polylineColor,
+          strokeOpacity: 0.5,
           strokeWeight,
           visible,
           zIndex,
@@ -288,6 +289,7 @@ function Maps() {
           map,
           path: simplifiedPath,
           strokeColor,
+          strokeOpacity: 0.5,
           strokeWeight: strokeWeight * 1.5,
           visible,
           zIndex: zIndex - 1,
@@ -303,12 +305,12 @@ function Maps() {
             busRoutePolylinesRef.current
               .set(busRouteType!, [])
               .get(busRouteType!)!;
-          busRoutePolylines.push(stroke, fill);
+          busRoutePolylines.push(...polylines);
         } else {
           const routePolylines =
             routePolylinesRef.current.get(route_type) ??
             routePolylinesRef.current.set(route_type, []).get(route_type)!;
-          routePolylines.push(stroke, fill);
+          routePolylines.push(...polylines);
         }
       });
   }, [getVisibility, map, routeMap, shapesMap, tripMap, zoom]);
