@@ -8,7 +8,8 @@ import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Trip } from "./api/trips/route";
 import { Vehicle, VehiclePositions } from "./api/vehiclepositions/route";
-import { Filters } from "./filters";
+import { Filters, Visibility } from "./filters";
+import { Information } from "./information";
 import styles from "./maps.module.css";
 import { Point } from "./point";
 import {
@@ -29,14 +30,24 @@ const UPDATE_INTERVAL = 5000;
 const ZOOM = 12;
 const ZOOM_DEBOUNCE = 1000;
 
+type Selected = {
+  polylines: google.maps.Polyline[];
+  trip: Trip;
+};
+
 export const MapContext = React.createContext<{
   map: google.maps.Map | null;
+  routeMap: Map<number, Route> | null;
+  shapesMap: Map<string, Shape[]> | null;
+  tripMap: Map<string, Trip> | null;
+  visibility: Visibility;
   getVisibility: (
     routeType: RouteType,
     busRouteType?: BusRouteType | null
   ) => boolean;
-  setVisibility: React.Dispatch<React.SetStateAction<Filters>>;
-  visibility: Filters;
+  setVisibility: React.Dispatch<React.SetStateAction<Visibility>>;
+  selected: Selected;
+  setSelected: React.Dispatch<React.SetStateAction<Selected>>;
 }>(Object.create(null));
 export const MarkersMapContext = React.createContext<React.MutableRefObject<
   Map<string, google.maps.marker.AdvancedMarkerElement[]>
@@ -46,6 +57,7 @@ const routeIdValues = Object.values(RouteId);
 
 function Maps() {
   const [map, setMap] = React.useState<google.maps.Map | null>(null);
+  const [selected, setSelected] = React.useState<Selected>(Object.create(null));
   const [zoom, setZoom] = React.useState(ZOOM);
   const zoomTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -111,7 +123,7 @@ function Maps() {
     new Map()
   );
 
-  const [visibility, setVisibility] = React.useState<Filters>({
+  const [visibility, setVisibility] = React.useState<Visibility>({
     rail: true,
     frequent: true,
     standard: true,
@@ -364,9 +376,20 @@ function Maps() {
   return (
     <div className={styles["maps-container"]}>
       <MapContext.Provider
-        value={{ map, getVisibility, setVisibility, visibility }}
+        value={{
+          map,
+          routeMap,
+          shapesMap,
+          tripMap,
+          visibility,
+          getVisibility,
+          setVisibility,
+          selected,
+          setSelected,
+        }}
       >
         <Filters />
+        <Information />
         <MarkersMapContext.Provider value={markersMapRef}>
           <div className={styles["maps-map"]}>
             <GoogleMap onLoad={onMapLoad}>
@@ -395,8 +418,6 @@ function Maps() {
                         lng: shape.shape_pt_lon,
                       }));
 
-                      console.log("clicked", vehicle);
-
                       const bounds = new google.maps.LatLngBounds();
                       path.forEach((point) => bounds.extend(point));
 
@@ -418,6 +439,7 @@ function Maps() {
                         zIndex: zIndex,
                       });
                       setSelectedPolylines([outline, fill]);
+                      setSelected({ polylines: [outline, fill], trip });
                       map.fitBounds(bounds);
                     }}
                     route={route}

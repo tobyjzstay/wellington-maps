@@ -10,7 +10,7 @@ import React from "react";
 import styles from "./filters.module.css";
 import { MapContext } from "./maps";
 
-export type Filters = {
+export type Visibility = {
   rail: boolean;
   frequent: boolean;
   standard: boolean;

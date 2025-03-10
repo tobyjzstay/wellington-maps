@@ -1,0 +1,38 @@
+.information-paper {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.information-summary {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  padding: 8px;
+  gap: 8px;
+}
+
+.information-marker-icon {
+  align-items: center;
+  border-radius: 50%;
+  display: flex;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.information-destination {
+  align-items: center;
+  display: flex;
+  font-size: larger;
+  font-weight: 600;
+  margin: auto;
+}
+
+.information-marker-label {
+  border-radius: 50%;
+  font-family: roboto, sans-serif;
+  font-size: 18.75px;
+  font-weight: 700;
+}
