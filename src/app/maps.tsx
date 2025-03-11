@@ -32,7 +32,7 @@ const ZOOM_DEBOUNCE = 1000;
 
 type Selected = {
   polylines: google.maps.Polyline[];
-  trip: Trip;
+  trip: Trip | null;
 };
 
 export const MapContext = React.createContext<{
@@ -89,17 +89,15 @@ function Maps() {
     });
   }, [map, updateZoom]);
 
-  const [selectedPolylines, setSelectedPolylines] = React.useState<
-    google.maps.Polyline[]
-  >([]);
-
   React.useEffect(() => {
     if (!map) return;
     map.addListener("click", () => {
-      selectedPolylines.forEach((polyline) => polyline.setMap(null));
-      setSelectedPolylines([]);
+      setSelected((prev) => {
+        prev.polylines.forEach((polyline) => polyline.setMap(null));
+        return { polylines: [], trip: null };
+      });
     });
-  }, [map, selectedPolylines]);
+  }, [map, selected]);
 
   const [routeMap, setRouteMap] = React.useState<Map<number, Route> | null>(
     null
@@ -267,18 +265,25 @@ function Maps() {
         const onClick = () => {
           const zIndex = getZIndex(id, ZIndexLayer.POLYLINE_SELECTED);
           const fill = new google.maps.Polyline({
+            id: trip_id,
+            map,
             path,
             strokeColor: polylineColor,
             strokeWeight: strokeWeight * 3,
             zIndex,
-          });
+          } as any);
           const stroke = new google.maps.Polyline({
+            id: trip_id,
+            map,
             path,
             strokeColor,
             strokeWeight: strokeWeight * 1.5 * 3,
             zIndex: zIndex - 1,
+          } as any);
+          setSelected((prev) => {
+            prev.polylines.forEach((polyline) => polyline.setMap(null));
+            return { polylines: [fill, stroke], trip: null };
           });
-          setSelectedPolylines([fill, stroke]);
           map.fitBounds(bounds);
         };
 
@@ -321,18 +326,9 @@ function Maps() {
       });
   }, [getVisibility, map, routeMap, shapesMap, tripMap, zoom]);
 
-  React.useEffect(() => {
-    if (!map) return;
-    selectedPolylines.forEach((polyline) => polyline.setMap(map));
-    return () => {
-      selectedPolylines.forEach((polyline) => polyline.setMap(null));
-    };
-  }, [selectedPolylines, map]);
-
   const markersMapRef = React.useRef(
     new Map<string, google.maps.marker.AdvancedMarkerElement[]>()
   );
-  const [vehicleType, setVehicleType] = React.useState(false);
   React.useEffect(() => {
     if (!routeMap || !shapesMap || !tripMap) return;
     let interval: NodeJS.Timeout;
@@ -426,25 +422,26 @@ function Maps() {
                         ZIndexLayer.POLYLINE_SELECTED
                       );
 
-                      const outline = new google.maps.Polyline({
-                        path,
-                        strokeColor: "#ffffff",
-                        strokeWeight: 9,
-                        zIndex: zIndex - 1,
-                      });
                       const fill = new google.maps.Polyline({
+                        map,
                         path,
                         strokeColor: polylineColor,
                         strokeWeight: 6,
                         zIndex: zIndex,
                       });
-                      setSelectedPolylines([outline, fill]);
-                      setSelected({ polylines: [outline, fill], trip });
+                      const outline = new google.maps.Polyline({
+                        map,
+                        path,
+                        strokeColor: "#ffffff",
+                        strokeWeight: 9,
+                        zIndex: zIndex - 1,
+                      });
+                      setSelected({ polylines: [fill, outline], trip });
                       map.fitBounds(bounds);
                     }}
                     route={route}
                     vehicle={vehicle}
-                    vehicleType={vehicleType}
+                    vehicleType={visibility.vehicleType}
                     visible={getVisibility(route_type, busRouteType)}
                   />
                 );

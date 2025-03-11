@@ -1,20 +1,22 @@
 .information-paper {
   position: absolute;
-  top: 8px;
   right: 8px;
+  top: 8px;
   z-index: 1;
 }
 
 .information-summary {
+  align-items: center;
   display: flex;
   flex-direction: row;
   justify-content: center;
-  padding: 8px;
   gap: 8px;
+  padding: 8px;
 }
 
 .information-marker-icon {
   align-items: center;
+  border: 2px solid;
   border-radius: 50%;
   display: flex;
   height: 48px;
@@ -25,9 +27,13 @@
 .information-destination {
   align-items: center;
   display: flex;
+  font-family: roboto, sans-serif;
   font-size: larger;
-  font-weight: 600;
+  font-weight: 500;
   margin: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 240px;
 }
 
 .information-marker-label {

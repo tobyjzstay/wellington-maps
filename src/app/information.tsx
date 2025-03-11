@@ -7,10 +7,11 @@ import { getRouteColors } from "./util";
 export function Information() {
   const { selected, routeMap, shapesMap, tripMap } =
     React.useContext(MapContext);
-  if (!selected) return null;
-  const { polylines, trip } = selected;
+  if (!selected || !routeMap || !shapesMap || !tripMap) return null;
+  const { polylines, trip: _trip } = selected;
+  const trip =
+    _trip ?? (polylines?.length && tripMap.get((polylines[0] as any).id));
   if (!trip) return null;
-  if (!routeMap || !shapesMap || !tripMap) return null;
   const route = routeMap.get(trip.route_id);
   if (!route) return null;
 
@@ -22,7 +23,7 @@ export function Information() {
       <div className={styles["information-summary"]}>
         <div
           className={styles["information-marker-icon"]}
-          style={{ backgroundColor, border: `2px solid ${strokeColor}` }}
+          style={{ backgroundColor, borderColor: strokeColor }}
         >
           <div
             className={styles["information-marker-label"]}
@@ -31,9 +32,9 @@ export function Information() {
             {route.route_short_name}
           </div>
         </div>
-        <p className={styles["information-destination"]}>
+        <div className={styles["information-destination"]}>
           {route.route_long_name}
-        </p>
+        </div>
       </div>
     </Paper>
   );
