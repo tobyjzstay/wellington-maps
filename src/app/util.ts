@@ -442,10 +442,9 @@ export async function getRouteMap() {
   if (!response.ok) return null;
   try {
     const routes: Route[] = await response.json();
-    const routeMap = new Map<number, Route>();
+    const routeMap = new Map<Route["route_id"], Route>();
     for (const route of routes) {
-      const route_id = parseInt(route.route_id);
-      routeMap.set(route_id, route);
+      routeMap.set(route.route_id, route);
     }
     return routeMap;
   } catch (error) {
@@ -459,7 +458,7 @@ export async function getShapeMap() {
   if (!response.ok) return null;
   try {
     const shapes: Shape[] = await response.json();
-    const shapeMap = new Map<string, Shape[]>();
+    const shapeMap = new Map<Shape["shape_id"], Shape[]>();
     for (let i = 0; i < shapes.length; i++) {
       const shape = shapes[i];
       const { shape_id } = shape;
@@ -478,7 +477,7 @@ export async function getTripMap() {
   if (!response.ok) return null;
   try {
     const trips: Trip[] = await response.json();
-    const tripMap = new Map<string, Trip>();
+    const tripMap = new Map<Trip["trip_id"], Trip>();
     for (const trip of trips) {
       tripMap.set(trip.trip_id, trip);
     }

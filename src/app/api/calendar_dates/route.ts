@@ -3,11 +3,15 @@
 import { getMetlinkData } from "../util";
 
 export type CalendarDate = {
-  id: number;
   service_id: string;
-  date: string;
-  exception_type: number;
+  date: Date;
+  exception_type: ExceptionType;
 };
+
+export enum ExceptionType {
+  ADDED = 1,
+  REMOVED = 2,
+}
 
 export async function GET(request: Request) {
   return getMetlinkData(request);

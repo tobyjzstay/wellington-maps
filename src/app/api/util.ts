@@ -59,37 +59,37 @@ export async function getMetlinkFullData(
 
     const zip = new JSZip();
     await zip.loadAsync(buffer);
-    const files = zip.file(/\.txt$/);
     const fullData = Object.create(null);
+    const files = zip.file(/\.txt$/);
     for (const file of files) {
       const text = await file.async("text");
-      let headers: string[] | null = null;
-      let dataKey = file.name.slice(0, ".txt".length * -1) as keyof Full;
-      if (dataKey === "routes") continue; // TODO: parse routes correctly
-      const data: Full[typeof dataKey] = [];
+      let fileName = file.name.slice(0, ".txt".length * -1);
+      let headers: (string | null)[] | null = null;
+      const fileData: Full[] = [];
       for (const line of text.split("\n")) {
         if (headers === null) {
-          headers = line.split(",");
+          headers = line.split(",").map((header) => header.trim());
           continue;
         }
         const datum = Object.create(null);
-        const values = line.split(",");
+        const values = parseCsvLine(line);
         for (let i = 0; i < headers.length; i++) {
           const header = headers[i];
+          if (!header) continue;
           let value: any = values[i];
-          switch (dataKey) {
+          switch (fileName) {
             case "agency":
-              switch (header) {
-                case "id":
-                  value = parseInt(value);
+              switch (header as keyof Agency) {
+                case "agency_url":
+                case "agency_fare_url":
+                  value = parseUrl(value);
                   break;
                 default:
                   break;
               }
               break;
             case "calendar":
-              switch (header) {
-                case "id":
+              switch (header as keyof Calendar) {
                 case "monday":
                 case "tuesday":
                 case "wednesday":
@@ -99,97 +99,113 @@ export async function getMetlinkFullData(
                 case "sunday":
                   value = parseInt(value);
                   break;
+                case "start_date":
+                case "end_date":
+                  value = parseDate(value);
+                  break;
                 default:
                   break;
               }
+              break;
             case "calendar_dates":
-              switch (header) {
-                case "id":
+              switch (header as keyof CalendarDate) {
+                case "date":
+                  value = parseDate(value);
+                  break;
                 case "exception_type":
                   value = parseInt(value);
-                  break;
                 default:
                   break;
               }
               break;
             case "feed_info":
-              switch (header) {
-                case "id":
+              switch (header as keyof FeedInfo) {
+                case "feed_publisher_url":
+                  value = parseUrl(value);
+                  break;
+                case "feed_start_date":
+                case "feed_end_date":
+                  value = parseDate(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
+            case "routes":
+              switch (header as keyof Route) {
+                case "route_url":
+                  value = parseUrl(value);
+                  break;
+                case "route_sort_order":
                   value = parseInt(value);
                   break;
                 default:
                   break;
               }
               break;
-            // case "routes":
-            //   switch (header) {
-            //     case "id":
-            //     case "route_type":
-            //       value = parseInt(value);
-            //       break;
-            //     default:
-            //       break;
-            //   }
-            //   break;
             case "shapes":
-              switch (header) {
-                case "id":
-                case "shape_pt_sequence":
-                case "shape_dist_traveled":
-                  value = parseInt(value);
+              switch (header as keyof Shape) {
                 case "shape_pt_lat":
                 case "shape_pt_lon":
+                case "shape_dist_traveled":
                   value = parseFloat(value);
+                  break;
+                case "shape_pt_sequence":
+                  value = parseInt(value);
                   break;
                 default:
                   break;
               }
               break;
             case "stop_times":
-              switch (header) {
-                case "id":
+              switch (header as keyof StopTime) {
                 case "stop_sequence":
-                case "shape_dist_traveled":
                 case "pickup_type":
                 case "drop_off_type":
+                case "timepoint":
                   value = parseInt(value);
                   break;
-                default:
-                  break;
-              }
-              break;
-            case "stops":
-              switch (header) {
-                case "id":
-                case "stop_code":
-                case "location_type":
-                case "parent_station":
-                  value = parseInt(value);
-                  break;
-                case "stop_lat":
-                case "stop_lon":
+                case "shape_dist_traveled":
                   value = parseFloat(value);
                   break;
                 default:
                   break;
               }
               break;
+            case "stops":
+              switch (header as keyof Stop) {
+                case "stop_lat":
+                case "stop_lon":
+                  value = parseFloat(value);
+                  break;
+                case "stop_url":
+                  value = parseUrl(value);
+                  break;
+                case "location_type":
+                  value = parseInt(value);
+                  break;
+                default:
+                  break;
+              }
+              break;
             case "transfers":
-              switch (header) {
-                case "id":
+              switch (header as keyof Transfer) {
+                case "transfer_type":
+                  value = parseInt(value);
+                  break;
+                case "min_transfer_time":
                   value = parseInt(value);
                 default:
                   break;
               }
               break;
             case "trips":
-              switch (header) {
-                case "id":
-                case "route_id":
+              switch (header as keyof Trip) {
                 case "direction_id":
                 case "wheelchair_accessible":
                 case "bikes_allowed":
                   value = parseInt(value);
+                  break;
                 default:
                   break;
               }
@@ -199,12 +215,12 @@ export async function getMetlinkFullData(
           }
           datum[header] = value;
         }
-        data.push(datum);
+        fileData.push(datum);
       }
-      fullData[dataKey] = data;
-      const body = JSON.stringify(data);
+      fullData[fileName] = fileData;
+      const body = JSON.stringify(fileData);
       const compressed = await gzip(body);
-      cache.put(dataKey, compressed, 86400000);
+      cache.put(fileName, compressed, 86400000);
     }
     return fullData as Full;
   })();
@@ -290,4 +306,51 @@ function getTimestamp() {
   const seconds = String(now.getSeconds()).padStart(2, "0");
 
   return `[${year}-${month}-${day} ${hours}:${minutes}:${seconds}]`;
+}
+
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let currentField = "";
+  let insideQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (insideQuotes && line[i + 1] === '"') {
+        currentField += '"';
+        i++;
+      } else insideQuotes = !insideQuotes;
+    } else if (char === "," && !insideQuotes) {
+      result.push(currentField.trim());
+      currentField = "";
+    } else currentField += char;
+  }
+
+  result.push(currentField.trim());
+
+  return result;
+}
+
+function parseUrl(urlString: string) {
+  if (!urlString) return undefined;
+  try {
+    return new URL(urlString);
+  } catch (error) {
+    console.warn(getTimestamp(), "Failed to parse URL.", error);
+    return undefined;
+  }
+}
+
+function parseDate(dateString: string) {
+  if (!dateString) return undefined;
+  try {
+    const year = parseInt(dateString.slice(0, 4), 10);
+    const month = parseInt(dateString.slice(4, 6), 10) - 1;
+    const day = parseInt(dateString.slice(6, 8), 10);
+
+    return new Date(year, month, day);
+  } catch (error) {
+    console.warn(getTimestamp(), "Failed to parse date.", error);
+    return undefined;
+  }
 }

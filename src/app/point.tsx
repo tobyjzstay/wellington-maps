@@ -1,6 +1,6 @@
 import React from "react";
 import { Route } from "./api/routes/route";
-import { Vehicle } from "./api/vehiclepositions/route";
+import { VehiclePosition } from "./api/vehiclepositions/route";
 import { MapContext, MarkersMapContext } from "./maps";
 import styles from "./point.module.css";
 import {
@@ -23,7 +23,7 @@ export function Point({
 }: {
   onClick: () => void;
   route: Route;
-  vehicle: Vehicle;
+  vehicle: VehiclePosition;
   vehicleType: boolean;
   visible: boolean;
 }) {
@@ -38,10 +38,10 @@ export function Point({
     React.useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const markerRefs = [markerRef, bearingMarkerRef, typeMarkerRef];
 
-  const { id, route_id, route_short_name, route_long_name, route_type } = route;
+  const { route_id, route_short_name, route_long_name, route_type } = route;
   const { position, timestamp } = vehicle;
-  const { latitude, longitude, bearing } = position;
-  const vehicle_id = vehicle.vehicle.id;
+  const { latitude, longitude, bearing } = position || {};
+  const vehicle_id = vehicle!.vehicle!.id;
   const stale = Math.floor(Date.now() / 1000) - timestamp > STALE_DURATION;
 
   const { backgroundColor, polylineColor, strokeColor, textColor, typeColor } =
@@ -54,7 +54,13 @@ export function Point({
     ) * markerRefs.length;
 
   React.useEffect(() => {
-    if (!map || !markersMap?.current) return;
+    if (
+      !map ||
+      !markersMap?.current ||
+      latitude === undefined ||
+      longitude === undefined
+    )
+      return;
 
     const newPosition: google.maps.LatLngLiteral = {
       lat: latitude,
@@ -77,7 +83,7 @@ export function Point({
 
       const label = document.createElement("div");
       label.className = styles["point-marker-label"];
-      label.innerText = route_short_name;
+      label.innerText = route_short_name ?? ""; // TODO: render placeholder
       label.style.color = textColor;
       markerContent.appendChild(label);
 
@@ -92,45 +98,48 @@ export function Point({
     } else
       updateMarker(map, markerRef.current, visible, stale, zIndex, newPosition);
 
-    if (!bearingMarkerRef.current) {
-      const bearingContent = document.createElement("div");
-      bearingContent.className = styles["point-bearing"];
-      bearingContent.style.visibility = visible ? "visible" : "hidden";
-      bearingContent.style.opacity = stale ? "0.5" : "1";
+    if (bearing !== undefined)
+      if (!bearingMarkerRef.current) {
+        const bearingContent = document.createElement("div");
+        bearingContent.className = styles["point-bearing"];
+        bearingContent.style.visibility = visible ? "visible" : "hidden";
+        bearingContent.style.opacity = stale ? "0.5" : "1";
 
-      const bearingRad = (bearing * Math.PI) / 180;
-      const offsetX = 24 * Math.sin(bearingRad);
-      const offsetY = -24 * Math.cos(bearingRad);
-      bearingContent.style.transform = `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px)`;
+        const bearingRad = (bearing * Math.PI) / 180;
+        const offsetX = 24 * Math.sin(bearingRad);
+        const offsetY = -24 * Math.cos(bearingRad);
+        bearingContent.style.transform = `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px)`;
 
-      const bearingSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -9 22 15" classname="${styles["point-bearing-svg"]}">
+        const bearingSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -9 22 15" classname="${styles["point-bearing-svg"]}">
       <path d="M 0 -2 L 0 -2 L -7 5 L -10 2 L 0 -8 L 10 2 L 7 5 Z"  fill="${polylineColor}"/>
     </svg>
   `;
-      bearingContent.innerHTML = bearingSvg;
+        bearingContent.innerHTML = bearingSvg;
 
-      const bearingSvgElement = bearingContent.querySelector("svg")!;
-      bearingSvgElement.classList.add(styles["point-bearing-svg"]);
-      bearingSvgElement.style.transform = `rotate(${bearing}deg)`;
+        const bearingSvgElement = bearingContent.querySelector("svg")!;
+        bearingSvgElement.classList.add(styles["point-bearing-svg"]);
+        bearingSvgElement.style.transform = `rotate(${bearing}deg)`;
 
-      bearingMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
-        content: bearingContent,
-        map,
-        position: { lat: latitude, lng: longitude },
-        title: route_long_name,
-        zIndex: zIndex + 2,
-      });
-      bearingMarkerRef.current.addListener("gmp-click", onClick);
-    } else
-      updateMarker(
-        map,
-        bearingMarkerRef.current,
-        visible,
-        stale,
-        zIndex + 2,
-        newPosition,
-        bearing
-      );
+        bearingMarkerRef.current = new google.maps.marker.AdvancedMarkerElement(
+          {
+            content: bearingContent,
+            map,
+            position: { lat: latitude, lng: longitude },
+            title: route_long_name,
+            zIndex: zIndex + 2,
+          }
+        );
+        bearingMarkerRef.current.addListener("gmp-click", onClick);
+      } else
+        updateMarker(
+          map,
+          bearingMarkerRef.current,
+          visible,
+          stale,
+          zIndex + 2,
+          newPosition,
+          bearing
+        );
 
     if (!typeMarkerRef.current) {
       const typeContent = document.createElement("div");
@@ -169,11 +178,8 @@ export function Point({
         newPosition
       );
 
-    const markers = [
-      markerRef.current,
-      bearingMarkerRef.current,
-      typeMarkerRef.current,
-    ];
+    const markers = [markerRef.current, typeMarkerRef.current];
+    if (bearingMarkerRef.current) markers.push(bearingMarkerRef.current);
     markersMap.current.set(vehicle_id, markers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

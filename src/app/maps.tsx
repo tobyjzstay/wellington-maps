@@ -7,7 +7,10 @@ import simplify from "simplify-js";
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Trip } from "./api/trips/route";
-import { Vehicle, VehiclePositions } from "./api/vehiclepositions/route";
+import {
+  VehiclePosition,
+  VehiclePositions,
+} from "./api/vehiclepositions/route";
 import { Filters, Visibility } from "./filters";
 import { Information } from "./information";
 import styles from "./maps.module.css";
@@ -37,9 +40,9 @@ type Selected = {
 
 export const MapContext = React.createContext<{
   map: google.maps.Map | null;
-  routeMap: Map<number, Route> | null;
-  shapesMap: Map<string, Shape[]> | null;
-  tripMap: Map<string, Trip> | null;
+  routeMap: Map<RouteId, Route> | null;
+  shapesMap: Map<Shape["shape_id"], Shape[]> | null;
+  tripMap: Map<Trip["trip_id"], Trip> | null;
   visibility: Visibility;
   getVisibility: (
     routeType: RouteType,
@@ -57,7 +60,10 @@ const routeIdValues = Object.values(RouteId);
 
 function Maps() {
   const [map, setMap] = React.useState<google.maps.Map | null>(null);
-  const [selected, setSelected] = React.useState<Selected>(Object.create(null));
+  const [selected, setSelected] = React.useState<Selected>({
+    polylines: [],
+    trip: null,
+  });
   const [zoom, setZoom] = React.useState(ZOOM);
   const zoomTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
@@ -99,13 +105,17 @@ function Maps() {
     });
   }, [map, selected]);
 
-  const [routeMap, setRouteMap] = React.useState<Map<number, Route> | null>(
+  const [routeMap, setRouteMap] = React.useState<Map<RouteId, Route> | null>(
     null
   );
-  const [shapesMap, setShapesMap] = React.useState<Map<string, Shape[]> | null>(
-    null
-  );
-  const [tripMap, setTripMap] = React.useState<Map<string, Trip> | null>(null);
+  const [shapesMap, setShapesMap] = React.useState<Map<
+    Shape["shape_id"],
+    Shape[]
+  > | null>(null);
+  const [tripMap, setTripMap] = React.useState<Map<
+    Trip["trip_id"],
+    Trip
+  > | null>(null);
   React.useEffect(() => {
     Promise.all([getRouteMap(), getShapeMap(), getTripMap()]).then(
       ([routes, shapes, trips]) => {
@@ -117,9 +127,9 @@ function Maps() {
     );
   }, []);
 
-  const [vehicleMap, setVehicleMap] = React.useState<Map<string, Vehicle>>(
-    new Map()
-  );
+  const [vehicleMap, setVehicleMap] = React.useState<
+    Map<string, VehiclePosition>
+  >(new Map());
 
   const [visibility, setVisibility] = React.useState<Visibility>({
     rail: true,
@@ -176,10 +186,11 @@ function Maps() {
           polylines.forEach((polyline, index) => {
             const trip_id = (polyline as any).id;
             const trip = tripMap.get(trip_id);
-            const { route_id: trip_route_id, shape_id } = trip!;
-            const route = routeMap.get(trip_route_id);
-            const { route_id, route_type } = route!;
+            const { route_id, shape_id } = trip!;
+            const route = routeMap.get(route_id);
+            const { route_type } = route!;
             const busRouteType = getBusRouteType(route_id);
+            if (!shape_id) return;
             const shapes = shapesMap.get(shape_id);
             const visible = getVisibility(route_type, busRouteType);
             if (!shapes) {
@@ -188,9 +199,9 @@ function Maps() {
               return;
             }
 
-            const path = shapes.map((shape) => ({
-              lat: shape.shape_pt_lat,
-              lng: shape.shape_pt_lon,
+            const path = shapes.map(({ shape_pt_lat, shape_pt_lon }) => ({
+              lat: shape_pt_lat,
+              lng: shape_pt_lon,
             }));
             const tolerance = 0.0001 * Math.pow(2, ZOOM - zoom);
             const simplifiedPoints = simplify(
@@ -213,19 +224,19 @@ function Maps() {
       });
     else
       tripMap.forEach((trip) => {
-        const { trip_id, route_id: trip_route_id, shape_id } = trip;
+        const { trip_id, route_id, shape_id } = trip;
 
-        if (drawnShapeIds.includes(shape_id)) return;
+        if (!shape_id || drawnShapeIds.includes(shape_id)) return;
         else drawnShapeIds.push(shape_id);
 
-        const route = routeMap.get(trip_route_id);
+        const route = routeMap.get(route_id);
         if (!route) {
           if (process.env.NODE_ENV === "development")
-            console.warn("Route not found:", trip_route_id);
+            console.warn("Route not found:", route_id);
           return;
         }
 
-        const { route_id, route_type } = route;
+        const { route_type } = route;
         const shapes = shapesMap.get(shape_id);
         if (!shapes) {
           if (process.env.NODE_ENV === "development")
@@ -251,6 +262,11 @@ function Maps() {
         path.forEach((point) => bounds.extend(point));
 
         const id = routeIdValues.indexOf(route_id);
+        if (id === -1) {
+          if (process.env.NODE_ENV === "development")
+            console.warn("Route ID not found:", route_id);
+          return;
+        }
         const zIndex = getZIndex(id, ZIndexLayer.POLYLINE);
         const busRouteType = getBusRouteType(route_id);
         if (route_type === RouteType.BUS && busRouteType === null) {
@@ -347,9 +363,10 @@ function Maps() {
         setVehicleMap((prevVehicleMap) => {
           const updatedVehicleIds = new Set<string>();
           const newVehicleMap = new Map(prevVehicleMap);
-          vehiclepositions.entity.forEach((entity) => {
+          vehiclepositions.entity?.forEach((entity) => {
             const { vehicle } = entity;
-            const vehicleId = vehicle.vehicle.id;
+            const vehicleId = vehicle.vehicle?.id;
+            if (!vehicleId) return;
             newVehicleMap.set(vehicleId, vehicle);
             updatedVehicleIds.add(vehicleId);
           });
@@ -391,7 +408,9 @@ function Maps() {
             <GoogleMap onLoad={onMapLoad}>
               {Array.from(vehicleMap).map(([vehicleId, vehicle]) => {
                 if (!map || !routeMap || !shapesMap || !tripMap) return;
-                const route = routeMap.get(vehicle.trip.route_id);
+                const routeId = vehicle.trip?.route_id as any; // TODO: Metlink incorrectly uses type number for `route_id`
+                if (!routeId) return null;
+                const route = routeMap.get(String(routeId) as RouteId);
                 if (!route) return null;
                 const { polylineColor } = getRouteColors(route);
                 const { route_id, route_type } = route;
@@ -401,11 +420,13 @@ function Maps() {
                     key={vehicleId}
                     onClick={() => {
                       if (!map || !tripMap || !shapesMap || !routeMap) return;
-                      const trip_id = vehicle.trip.trip_id;
+                      const trip_id = vehicle.trip?.trip_id;
+                      if (!trip_id) return;
                       const trip = tripMap.get(trip_id);
                       if (!trip) return;
 
                       const { shape_id } = trip;
+                      if (!shape_id) return;
                       let shapes = shapesMap.get(shape_id);
                       if (!shapes) return;
 
@@ -418,7 +439,7 @@ function Maps() {
                       path.forEach((point) => bounds.extend(point));
 
                       const zIndex = getZIndex(
-                        parseInt(vehicle.vehicle.id),
+                        parseInt(vehicleId),
                         ZIndexLayer.POLYLINE_SELECTED
                       );
 

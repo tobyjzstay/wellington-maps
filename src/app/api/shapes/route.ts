@@ -3,12 +3,11 @@
 import { getMetlinkData } from "../util";
 
 export type Shape = {
-  id: number;
   shape_id: string;
   shape_pt_lat: number;
   shape_pt_lon: number;
   shape_pt_sequence: number;
-  shape_dist_traveled: number;
+  shape_dist_traveled?: number;
 };
 
 export async function GET(request: Request) {
