@@ -2,6 +2,12 @@
 
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents a shape.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#shapestxt
+ */
+
 export type Shape = {
   shape_id: string;
   shape_pt_lat: number;

@@ -4,6 +4,11 @@ import { Stop } from "../stops/route";
 import { Trip } from "../trips/route";
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents a transfer between two nodes.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#transferstxt
+ */
 export type Transfer = {
   from_stop_id?: Stop["stop_id"];
   to_stop_id?: Stop["stop_id"];

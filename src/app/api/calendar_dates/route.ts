@@ -2,6 +2,11 @@
 
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents a service calendar date.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#calendar_datestxt
+ */
 export type CalendarDate = {
   service_id: string;
   date: Date;

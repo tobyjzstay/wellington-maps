@@ -2,6 +2,11 @@
 
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents a transit agency.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#agencytxt
+ */
 export type Agency = {
   agency_id?: string;
   agency_name: string;

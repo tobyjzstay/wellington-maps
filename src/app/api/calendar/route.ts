@@ -2,6 +2,11 @@
 
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents a service calendar.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#calendartxt
+ */
 export type Calendar = {
   service_id: string;
   monday: Availability;

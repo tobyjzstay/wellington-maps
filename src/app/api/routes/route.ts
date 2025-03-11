@@ -4,6 +4,11 @@ import { RouteId, RouteType } from "@/app/util";
 import { Agency } from "../agency/route";
 import { fetchMetlinkData } from "../util";
 
+/**
+ * Represents a transit route.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#routestxt
+ */
 export type Route = {
   route_id: RouteId;
   agency_id?: Agency["agency_id"];

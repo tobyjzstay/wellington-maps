@@ -2,6 +2,11 @@
 
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents a stop.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#stopstxt
+ */
 export type Stop = {
   stop_id: string;
   stop_code?: string;

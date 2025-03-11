@@ -2,6 +2,11 @@
 
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents feed information.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#feed_infotxt
+ */
 export type FeedInfo = {
   feed_publisher_name: string;
   feed_publisher_url: URL;

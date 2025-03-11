@@ -6,6 +6,11 @@ import { Route } from "../routes/route";
 import { Shape } from "../shapes/route";
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents a transit trip.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#tripstxt
+ */
 export type Trip = {
   route_id: Route["route_id"];
   service_id: Calendar["service_id"] | CalendarDate["service_id"];

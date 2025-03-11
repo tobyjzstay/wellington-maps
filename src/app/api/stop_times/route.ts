@@ -4,6 +4,11 @@ import { Stop } from "../stops/route";
 import { Trip } from "../trips/route";
 import { getMetlinkData } from "../util";
 
+/**
+ * Represents a stop time.
+ *
+ * @see https://gtfs.org/documentation/schedule/reference/#stop_timestxt
+ */
 export type StopTime = {
   trip_id: Trip["trip_id"];
   arrival_time?: string;
