@@ -2,7 +2,7 @@
 
 import { RouteId, RouteType } from "@/app/util";
 import { Agency } from "../agency/route";
-import { fetchMetlinkData } from "../util";
+import { getMetlinkData } from "../util";
 
 /**
  * Represents a transit route.
@@ -22,9 +22,6 @@ export type Route = {
   route_sort_order?: number;
 };
 
-const key = "routes";
-const path = "https://api.opendata.metlink.org.nz/v1/gtfs/routes";
-
-export async function GET() {
-  return fetchMetlinkData(key, path, 86400000);
+export async function GET(request: Request) {
+  return getMetlinkData(request);
 }

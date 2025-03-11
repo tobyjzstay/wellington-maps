@@ -133,11 +133,12 @@ export async function getMetlinkFullData(
               break;
             case "routes":
               switch (header as keyof Route) {
-                case "route_url":
-                  value = parseUrl(value);
-                  break;
+                case "route_type":
                 case "route_sort_order":
                   value = parseInt(value);
+                  break;
+                case "route_url":
+                  value = parseUrl(value);
                   break;
                 default:
                   break;
