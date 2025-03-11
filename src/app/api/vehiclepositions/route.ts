@@ -1,5 +1,7 @@
 "use server";
 
+import { getKey, getTimestamp } from "@/app/util";
+import cache from "memory-cache";
 import { Route } from "../routes/route";
 import { Trip } from "../trips/route";
 import { fetchMetlinkData } from "../util";
@@ -72,9 +74,46 @@ type Position = {
   bearing?: number;
 };
 
-const key = "vehiclepositions";
 const path = "https://api.opendata.metlink.org.nz/v1/gtfs-rt/vehiclepositions";
 
-export async function GET() {
-  return fetchMetlinkData(key, path, 5000);
+let pending: Promise<Response> | null = null;
+
+export async function GET(request: Request) {
+  if (pending) await pending;
+
+  const key = getKey(request.url);
+  const data = cache.get(key);
+  if (data) {
+    const response = _response(data.body);
+    console.info(getTimestamp(), request.method, response.status, request.url);
+    return response;
+  }
+
+  pending = (async () => {
+    const response = await fetchMetlinkData(path);
+
+    try {
+      const json = await response.json();
+      json.header.gtfs_realtime_version = json.header.gtfsRealtimeVersion;
+      delete json.header.gtfsRealtimeVersion;
+      json.entity.forEach((entity: any) => {
+        entity.vehicle.trip.route_id = String(entity.vehicle.trip.route_id);
+      });
+      const body = JSON.stringify(json, null, 2);
+      cache.put(key, { body }, 5000);
+      return _response(body);
+    } catch (error) {
+      console.error(getTimestamp(), "Failed to parse Metlink data.", error);
+      return new Response(null, { status: 500 });
+    }
+  })();
+
+  return pending;
 }
+
+const _response = (body: BodyInit) =>
+  new Response(body, {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });

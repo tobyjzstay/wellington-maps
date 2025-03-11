@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import cache from "memory-cache";
 import { promisify } from "util";
 import zlib from "zlib";
+import { getKey, getTimestamp } from "../util";
 import { Agency } from "./agency/route";
 import { Calendar } from "./calendar/route";
 import { CalendarDate } from "./calendar_dates/route";
@@ -238,12 +239,6 @@ export async function getMetlinkData(request: Request) {
   return _response;
 }
 
-function getKey(urlString: string) {
-  const url = new URL(urlString);
-  const pathParts = url.pathname.split("/").filter(Boolean);
-  return pathParts[pathParts.length - 1];
-}
-
 const response = (body: BodyInit) =>
   new Response(body, {
     headers: {
@@ -252,23 +247,11 @@ const response = (body: BodyInit) =>
     },
   });
 
-export async function fetchMetlinkData(
-  key: string,
-  path: string,
-  revalidate: number
-) {
+export async function fetchMetlinkData(path: string) {
   if (!process.env.METLINK_API_KEY) {
     console.error(getTimestamp(), "No Metlink API key provided.");
     return new Response(null, { status: 500 });
   }
-
-  const cachedData = cache.get(key);
-  if (cachedData)
-    return new Response(cachedData.body, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
 
   const method = "GET";
   const response = await fetch(path, {
@@ -281,32 +264,7 @@ export async function fetchMetlinkData(
   });
   console.info(getTimestamp(), method, response.status, path);
 
-  try {
-    const json = await response.json();
-    const body = JSON.stringify(json, null, 2);
-    cache.put(key, { body }, revalidate);
-    return new Response(body, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  } catch (error) {
-    console.error(getTimestamp(), "Failed to fetch Metlink data.", error);
-    return new Response(null, { status: 500 });
-  }
-}
-
-function getTimestamp() {
-  const now = new Date();
-
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
-  const seconds = String(now.getSeconds()).padStart(2, "0");
-
-  return `[${year}-${month}-${day} ${hours}:${minutes}:${seconds}]`;
+  return response;
 }
 
 function parseCsvLine(line: string): string[] {

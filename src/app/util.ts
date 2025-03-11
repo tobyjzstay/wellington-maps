@@ -395,6 +395,7 @@ export function getRouteColors(route: Route) {
       break;
     case RouteType.CABLE_CAR:
       colors.typeColor = "#" + route_color;
+      break;
     case RouteType.SCHOOL_BUS:
       colors.typeColor = "#" + route_color;
       break;
@@ -490,4 +491,23 @@ export async function getTripMap() {
 
 export function getZIndex(id: number, layer: ZIndexLayer) {
   return Z_INDEX_BUFFER * (layer + 1) - id;
+}
+
+export function getKey(urlString: string) {
+  const url = new URL(urlString);
+  const pathParts = url.pathname.split("/").filter(Boolean);
+  return pathParts[pathParts.length - 1];
+}
+
+export function getTimestamp() {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+
+  return `[${year}-${month}-${day} ${hours}:${minutes}:${seconds}]`;
 }
