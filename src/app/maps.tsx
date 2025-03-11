@@ -408,9 +408,9 @@ function Maps() {
             <GoogleMap onLoad={onMapLoad}>
               {Array.from(vehicleMap).map(([vehicleId, vehicle]) => {
                 if (!map || !routeMap || !shapesMap || !tripMap) return;
-                const routeId = vehicle.trip?.route_id as any; // TODO: Metlink incorrectly uses type number for `route_id`
+                const routeId = vehicle.trip?.route_id;
                 if (!routeId) return null;
-                const route = routeMap.get(String(routeId) as RouteId);
+                const route = routeMap.get(routeId);
                 if (!route) return null;
                 const { polylineColor } = getRouteColors(route);
                 const { route_id, route_type } = route;
@@ -439,7 +439,7 @@ function Maps() {
                       path.forEach((point) => bounds.extend(point));
 
                       const zIndex = getZIndex(
-                        parseInt(vehicleId),
+                        parseInt(vehicleId) || parseInt(routeId),
                         ZIndexLayer.POLYLINE_SELECTED
                       );
 
@@ -457,7 +457,12 @@ function Maps() {
                         strokeWeight: 9,
                         zIndex: zIndex - 1,
                       });
-                      setSelected({ polylines: [fill, outline], trip });
+                      setSelected((prev) => {
+                        prev.polylines.forEach((polyline) =>
+                          polyline.setMap(null)
+                        );
+                        return { polylines: [fill, outline], trip };
+                      });
                       map.fitBounds(bounds);
                     }}
                     route={route}

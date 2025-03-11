@@ -49,7 +49,7 @@ export function Point({
 
   const zIndex =
     getZIndex(
-      parseInt(vehicle_id) ?? parseInt(route_id),
+      parseInt(vehicle_id) || parseInt(route_id),
       stale ? ZIndexLayer.MARKER_STALE : ZIndexLayer.MARKER
     ) * markerRefs.length;
 
