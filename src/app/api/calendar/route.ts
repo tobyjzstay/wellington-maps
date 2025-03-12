@@ -20,7 +20,7 @@ export type Calendar = {
   end_date: Date;
 };
 
-export enum Availability {
+enum Availability {
   NOT_AVAILABLE = 0,
   AVAILABLE = 1,
 }

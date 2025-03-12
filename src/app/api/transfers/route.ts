@@ -18,7 +18,7 @@ export type Transfer = {
   min_transfer_time?: number;
 };
 
-export enum TransferType {
+enum TransferType {
   RECOMMENDED = 0,
   TIMED = 1,
   MINIMUM_TIME = 2,

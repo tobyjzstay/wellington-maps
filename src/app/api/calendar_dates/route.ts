@@ -13,7 +13,7 @@ export type CalendarDate = {
   exception_type: ExceptionType;
 };
 
-export enum ExceptionType {
+enum ExceptionType {
   ADDED = 1,
   REMOVED = 2,
 }

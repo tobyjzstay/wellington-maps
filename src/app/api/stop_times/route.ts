@@ -22,14 +22,14 @@ export type StopTime = {
   timepoint?: Timepoint;
 };
 
-export enum StopType {
+enum StopType {
   REGULAR = 0,
   NOT_AVAILABLE = 1,
   PHONE_AGENCY = 2,
   COORDINATE_WITH_DRIVER = 3,
 }
 
-export enum Timepoint {
+enum Timepoint {
   APPROXIMATE = 0,
   EXACT = 1,
 }

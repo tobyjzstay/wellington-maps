@@ -21,7 +21,7 @@ export type Stop = {
   stop_timezone?: string;
 };
 
-export enum LocationType {
+enum LocationType {
   STOP = 0,
   STATION = 1,
   ENTRANCE_EXIT = 2,
