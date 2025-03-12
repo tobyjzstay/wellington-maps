@@ -1,6 +1,7 @@
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Stop } from "./api/stops/route";
+import { Transfer } from "./api/transfers/route";
 import { Trip } from "./api/trips/route";
 import bus from "./bus.svg";
 import cableCar from "./cable-car.svg";
@@ -501,6 +502,30 @@ export async function getTripMap() {
       tripMap.set(trip.trip_id, trip);
     }
     return tripMap;
+  } catch (error) {
+    console.error("Unable to parse trips.", error);
+    return null;
+  }
+}
+
+export async function getTransferMap() {
+  const response = await fetch("/api/transfers");
+  if (!response.ok) return null;
+  try {
+    const transfers: Transfer[] = await response.json();
+    const transferMap = new Map<
+      Transfer["from_stop_id"] | Transfer["to_stop_id"],
+      Transfer[]
+    >();
+    for (let i = 0; i < transfers.length; i++) {
+      const transfer = transfers[i];
+      const { from_stop_id, to_stop_id } = transfer;
+      if (!transferMap.has(from_stop_id)) transferMap.set(from_stop_id, []);
+      if (!transferMap.has(to_stop_id)) transferMap.set(to_stop_id, []);
+      transferMap.get(from_stop_id)!.push(transfer);
+      transferMap.get(to_stop_id)!.push(transfer);
+    }
+    return transferMap;
   } catch (error) {
     console.error("Unable to parse trips.", error);
     return null;

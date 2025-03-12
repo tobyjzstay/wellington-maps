@@ -7,6 +7,7 @@ import simplify from "simplify-js";
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
 import { Stop } from "./api/stops/route";
+import { Transfer } from "./api/transfers/route";
 import { Trip } from "./api/trips/route";
 import {
   VehiclePosition,
@@ -23,6 +24,7 @@ import {
   getRouteMap,
   getShapeMap,
   getStopMap,
+  getTransferMap,
   getTripMap,
   getZIndex,
   RouteId,
@@ -46,6 +48,10 @@ export const MapContext = React.createContext<{
   routeMap: Map<RouteId, Route> | null;
   shapesMap: Map<Shape["shape_id"], Shape[]> | null;
   tripMap: Map<Trip["trip_id"], Trip> | null;
+  transferMap: Map<
+    Transfer["from_stop_id"] | Transfer["to_stop_id"],
+    Transfer[]
+  > | null;
   visibility: Visibility;
   getVisibility: (
     routeType: RouteType,
@@ -123,18 +129,24 @@ function Maps() {
     Stop["stop_id"],
     Stop
   > | null>(null);
+  const [transferMap, setTransferMap] = React.useState<Map<
+    Transfer["from_stop_id"] | Transfer["to_stop_id"],
+    Transfer[]
+  > | null>(null);
   React.useEffect(() => {
     Promise.all([
       getRouteMap(),
       getShapeMap(),
       getStopMap(),
       getTripMap(),
-    ]).then(([routes, shapes, stops, trips]) => {
+      getTransferMap(),
+    ]).then(([routes, shapes, stops, trips, transfers]) => {
       // TODO: handle null
       setRouteMap(routes);
       setShapesMap(shapes);
       setStopMap(stops);
       setTripMap(trips);
+      setTransferMap(transfers);
     });
   }, []);
 
@@ -403,6 +415,7 @@ function Maps() {
           routeMap,
           shapesMap,
           tripMap,
+          transferMap,
           visibility,
           getVisibility,
           setVisibility,
@@ -425,7 +438,7 @@ function Maps() {
                 setSelected={setSelected}
                 visibility={visibility}
               />
-              <Stops map={map} stopMap={stopMap} />
+              <Stops map={map} stopMap={stopMap} transferMap={transferMap} />
             </GoogleMap>
           </div>
         </MarkersMapContext.Provider>
