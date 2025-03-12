@@ -1,0 +1,14 @@
+.stops-stop-icon {
+  background-color: #cddc2a;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #00364a;
+  box-sizing: border-box;
+  display: inline-block;
+  height: 12px;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+}

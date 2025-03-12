@@ -6,6 +6,7 @@ import React from "react";
 import simplify from "simplify-js";
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
+import { Stop } from "./api/stops/route";
 import { Trip } from "./api/trips/route";
 import {
   VehiclePosition,
@@ -15,12 +16,14 @@ import { Filters, Visibility } from "./filters";
 import { Information } from "./information";
 import styles from "./maps.module.css";
 import { Markers } from "./markers";
+import { Stops } from "./stops";
 import {
   BusRouteType,
   getBusRouteType,
   getRouteColors,
   getRouteMap,
   getShapeMap,
+  getStopMap,
   getTripMap,
   getZIndex,
   RouteId,
@@ -116,15 +119,23 @@ function Maps() {
     Trip["trip_id"],
     Trip
   > | null>(null);
+  const [stopMap, setStopMap] = React.useState<Map<
+    Stop["stop_id"],
+    Stop
+  > | null>(null);
   React.useEffect(() => {
-    Promise.all([getRouteMap(), getShapeMap(), getTripMap()]).then(
-      ([routes, shapes, trips]) => {
-        // TODO: handle null
-        setRouteMap(routes);
-        setShapesMap(shapes);
-        setTripMap(trips);
-      }
-    );
+    Promise.all([
+      getRouteMap(),
+      getShapeMap(),
+      getStopMap(),
+      getTripMap(),
+    ]).then(([routes, shapes, stops, trips]) => {
+      // TODO: handle null
+      setRouteMap(routes);
+      setShapesMap(shapes);
+      setStopMap(stops);
+      setTripMap(trips);
+    });
   }, []);
 
   const [vehicleMap, setVehicleMap] = React.useState<
@@ -414,6 +425,7 @@ function Maps() {
                 setSelected={setSelected}
                 visibility={visibility}
               />
+              <Stops map={map} stopMap={stopMap} />
             </GoogleMap>
           </div>
         </MarkersMapContext.Provider>

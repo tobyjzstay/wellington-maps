@@ -126,11 +126,6 @@ function Marker({
 
   const markerRef =
     React.useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
-  const bearingMarkerRef =
-    React.useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
-  const typeMarkerRef =
-    React.useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
-  const markerRefs = [markerRef, bearingMarkerRef, typeMarkerRef];
 
   const { route_id, route_short_name, route_long_name, route_type } = route;
   const { position, timestamp } = vehicle;
@@ -141,11 +136,10 @@ function Marker({
   const { backgroundColor, polylineColor, strokeColor, textColor, typeColor } =
     getRouteColors(route);
 
-  const zIndex =
-    getZIndex(
-      parseInt(vehicle_id) || parseInt(route_id),
-      stale ? ZIndexLayer.MARKER_STALE : ZIndexLayer.MARKER
-    ) * markerRefs.length;
+  const zIndex = getZIndex(
+    parseInt(vehicle_id) || parseInt(route_id),
+    stale ? ZIndexLayer.MARKER_STALE : ZIndexLayer.MARKER
+  );
 
   React.useEffect(() => {
     if (

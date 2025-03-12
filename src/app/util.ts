@@ -1,5 +1,6 @@
 import { Route } from "./api/routes/route";
 import { Shape } from "./api/shapes/route";
+import { Stop } from "./api/stops/route";
 import { Trip } from "./api/trips/route";
 import bus from "./bus.svg";
 import cableCar from "./cable-car.svg";
@@ -249,6 +250,7 @@ export enum RouteId {
 export enum ZIndexLayer {
   POLYLINE,
   POLYLINE_SELECTED,
+  STOP,
   MARKER_STALE,
   MARKER,
 }
@@ -469,6 +471,22 @@ export async function getShapeMap() {
     return shapeMap;
   } catch (error) {
     console.error("Unable to parse shapes.", error);
+    return null;
+  }
+}
+
+export async function getStopMap() {
+  const response = await fetch("/api/stops");
+  if (!response.ok) return null;
+  try {
+    const stops: Stop[] = await response.json();
+    const stopMap = new Map<Stop["stop_id"], Stop>();
+    for (const stop of stops) {
+      stopMap.set(stop.stop_id, stop);
+    }
+    return stopMap;
+  } catch (error) {
+    console.error("Unable to parse stops.", error);
     return null;
   }
 }
