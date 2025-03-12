@@ -15,7 +15,6 @@ import {
 import { Filters, Visibility } from "./filters";
 import { Information } from "./information";
 import styles from "./maps.module.css";
-import { Markers } from "./markers";
 import { Stops } from "./stops";
 import {
   BusRouteType,
@@ -30,6 +29,7 @@ import {
   RouteType,
   ZIndexLayer,
 } from "./util";
+import { Vehicles } from "./vehicles";
 
 const CENTER = { lat: -41.25, lng: 174.85 };
 const UPDATE_INTERVAL = 5000;
@@ -415,7 +415,7 @@ function Maps() {
         <MarkersMapContext.Provider value={markersMapRef}>
           <div className={styles["maps-map"]}>
             <GoogleMap onLoad={onMapLoad}>
-              <Markers
+              <Vehicles
                 map={map}
                 routeMap={routeMap}
                 shapesMap={shapesMap}

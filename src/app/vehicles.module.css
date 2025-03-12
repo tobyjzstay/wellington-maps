@@ -1,8 +1,8 @@
-.point-marker {
+.vehicles-marker {
   position: absolute;
 }
 
-.point-marker-icon {
+.vehicles-marker-icon {
   border-radius: 50%;
   height: 32px;
   left: 50%;
@@ -12,7 +12,7 @@
   width: 32px;
 }
 
-.point-marker-label {
+.vehicles-marker-label {
   border-radius: 50%;
   font-family: roboto, sans-serif;
   font-size: 12.5px;
@@ -23,7 +23,7 @@
   transform: translate(-50%, -50%);
 }
 
-.point-bearing {
+.vehicles-bearing {
   align-items: center;
   display: flex;
   justify-content: center;
@@ -32,7 +32,7 @@
   top: 50%;
 }
 
-.point-bearing-svg {
+.vehicles-bearing-svg {
   height: 16px;
   position: absolute;
   stroke: #ffffff;
@@ -41,12 +41,12 @@
   width: 16px;
 }
 
-.point-type {
+.vehicles-type {
   position: absolute;
   transform: translate(14px, 14px);
 }
 
-.point-type-icon {
+.vehicles-type-icon {
   border: 1px solid #ffffff;
   border-radius: 50%;
   height: 16px;
@@ -57,7 +57,7 @@
   width: 16px;
 }
 
-.point-type-icon-svg {
+.vehicles-type-icon-svg {
   align-items: center;
   display: flex;
   justify-content: center;

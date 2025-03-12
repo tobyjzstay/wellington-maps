@@ -5,7 +5,6 @@ import { Trip } from "./api/trips/route";
 import { VehiclePosition } from "./api/vehiclepositions/route";
 import { Visibility } from "./filters";
 import { MapContext, MarkersMapContext, Selected } from "./maps";
-import styles from "./point.module.css";
 import {
   BusRouteType,
   getBusRouteType,
@@ -15,11 +14,12 @@ import {
   RouteType,
   ZIndexLayer,
 } from "./util";
+import styles from "./vehicles.module.css";
 
 const MARKER_ANIMATION_DURATION = 1000;
 const STALE_DURATION = 30;
 
-export function Markers({
+export function Vehicles({
   map,
   routeMap,
   shapesMap,
@@ -160,16 +160,16 @@ function Marker({
     let markerContent = markerRef.current?.content as HTMLDivElement | null;
     if (!markerContent) {
       markerContent = document.createElement("div");
-      markerContent.className = styles["point-marker"];
+      markerContent.className = styles["vehicles-marker"];
 
       const icon = document.createElement("div");
-      icon.className = styles["point-marker-icon"];
+      icon.className = styles["vehicles-marker-icon"];
       icon.style.backgroundColor = backgroundColor;
       icon.style.border = `1px solid ${strokeColor}`;
       markerContent.appendChild(icon);
 
       const label = document.createElement("div");
-      label.className = styles["point-marker-label"];
+      label.className = styles["vehicles-marker-label"];
       label.innerText = route_short_name ?? ""; // TODO: render placeholder
       label.style.color = textColor;
       markerContent.appendChild(label);
@@ -180,21 +180,21 @@ function Marker({
 
     if (bearing !== undefined) {
       let bearingElement = markerContent.querySelector(
-        `.${styles["point-bearing"]}`
+        `.${styles["vehicles-bearing"]}`
       ) as HTMLDivElement | null;
       let bearingSvgElement = bearingElement?.querySelector("svg");
       if (!bearingElement) {
         bearingElement = document.createElement("div");
-        bearingElement.className = styles["point-bearing"];
+        bearingElement.className = styles["vehicles-bearing"];
         bearingElement.style.zIndex = `${zIndex + 2}`;
 
-        const bearingSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -9 22 15" classname="${styles["point-bearing-svg"]}">
+        const bearingSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -9 22 15" classname="${styles["vehicles-bearing-svg"]}">
         <path d="M 0 -2 L 0 -2 L -7 5 L -10 2 L 0 -8 L 10 2 L 7 5 Z"  fill="${polylineColor}"/>
       </svg>
     `;
         bearingElement.innerHTML = bearingSvg;
         bearingSvgElement = bearingElement.querySelector("svg")!;
-        bearingSvgElement.classList.add(styles["point-bearing-svg"])!;
+        bearingSvgElement.classList.add(styles["vehicles-bearing-svg"])!;
 
         const bearingRad = (bearing * Math.PI) / 180;
         const offsetX = 24 * Math.sin(bearingRad);
@@ -208,15 +208,15 @@ function Marker({
     }
 
     let typeElement = markerContent.querySelector(
-      `.${styles["point-type"]}`
+      `.${styles["vehicles-type"]}`
     ) as HTMLDivElement | null;
     if (!typeElement) {
       typeElement = document.createElement("div");
-      typeElement.className = styles["point-type"];
+      typeElement.className = styles["vehicles-type"];
       typeElement.style.zIndex = `${zIndex + 1}`;
 
       const typeIcon = document.createElement("div");
-      typeIcon.className = styles["point-type-icon"];
+      typeIcon.className = styles["vehicles-type-icon"];
       typeIcon.style.backgroundColor = typeColor;
       typeElement.appendChild(typeIcon);
 
@@ -224,7 +224,7 @@ function Marker({
       typeIcon.innerHTML = typeIconSvg;
 
       const typeIconSvgElement = typeIcon.querySelector("svg")!;
-      typeIconSvgElement.classList.add(styles["point-type-icon-svg"]);
+      typeIconSvgElement.classList.add(styles["vehicles-type-icon-svg"]);
       markerContent.appendChild(typeElement);
     }
     typeElement.style.visibility =
@@ -337,7 +337,9 @@ const updateMarker = (
 
   let startBearing: number | undefined;
   if (endBearing !== undefined) {
-    const bearingElement = marker.querySelector(`.${styles["point-bearing"]}`)!;
+    const bearingElement = marker.querySelector(
+      `.${styles["vehicles-bearing"]}`
+    )!;
     const bearingSvgElement = bearingElement.querySelector("svg");
     if (!bearingSvgElement) {
       marker.position = endPosition;
@@ -385,7 +387,7 @@ function stepAnimationPosition(
     const newBearing = startBearing + delta * easedProgress;
 
     const bearingElement = marker.querySelector(
-      `.${styles["point-bearing"]}`
+      `.${styles["vehicles-bearing"]}`
     )! as HTMLDivElement;
     const bearingSvgElement = bearingElement.querySelector("svg");
     if (bearingSvgElement) {
