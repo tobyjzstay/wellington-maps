@@ -1,20 +1,114 @@
 import React from "react";
 import { Route } from "./api/routes/route";
+import { Shape } from "./api/shapes/route";
+import { Trip } from "./api/trips/route";
 import { VehiclePosition } from "./api/vehiclepositions/route";
-import { MapContext, MarkersMapContext } from "./maps";
+import { Visibility } from "./filters";
+import { MapContext, MarkersMapContext, Selected } from "./maps";
 import styles from "./point.module.css";
 import {
+  BusRouteType,
+  getBusRouteType,
   getRouteColors,
   getRouteTypeSvg,
   getZIndex,
+  RouteType,
   ZIndexLayer,
 } from "./util";
 
 const MARKER_ANIMATION_DURATION = 1000;
-const MIN_PIXEL_MOVEMENT = 5;
 const STALE_DURATION = 30;
 
-export function Point({
+export function Markers({
+  map,
+  routeMap,
+  shapesMap,
+  tripMap,
+  vehicleMap,
+  getVisibility,
+  setSelected,
+  visibility,
+}: {
+  map: google.maps.Map | null;
+  routeMap: Map<string, Route> | null;
+  shapesMap: Map<string, Shape[]> | null;
+  tripMap: Map<string, Trip> | null;
+  vehicleMap: Map<string, VehiclePosition>;
+  getVisibility: (route_type: RouteType, busRouteType: BusRouteType) => boolean;
+  setSelected: React.Dispatch<React.SetStateAction<Selected>>;
+  visibility: Visibility;
+}) {
+  return (
+    <>
+      {Array.from(vehicleMap).map(([vehicleId, vehicle]) => {
+        if (!map || !routeMap || !shapesMap || !tripMap) return;
+        const routeId = vehicle.trip?.route_id;
+        if (!routeId) return null;
+        const route = routeMap.get(routeId);
+        if (!route) return null;
+        const { polylineColor } = getRouteColors(route);
+        const { route_id, route_type } = route;
+        const busRouteType = getBusRouteType(route_id)!;
+        return (
+          <Marker
+            key={vehicleId}
+            onClick={() => {
+              if (!map || !tripMap || !shapesMap || !routeMap) return;
+              const trip_id = vehicle.trip?.trip_id;
+              if (!trip_id) return;
+              const trip = tripMap.get(trip_id);
+              if (!trip) return;
+
+              const { shape_id } = trip;
+              if (!shape_id) return;
+              let shapes = shapesMap.get(shape_id);
+              if (!shapes) return;
+
+              const path = shapes.map((shape) => ({
+                lat: shape.shape_pt_lat,
+                lng: shape.shape_pt_lon,
+              }));
+
+              const bounds = new google.maps.LatLngBounds();
+              path.forEach((point) => bounds.extend(point));
+
+              const zIndex = getZIndex(
+                parseInt(vehicleId) || parseInt(routeId),
+                ZIndexLayer.POLYLINE_SELECTED
+              );
+
+              const fill = new google.maps.Polyline({
+                map,
+                path,
+                strokeColor: polylineColor,
+                strokeWeight: 6,
+                zIndex: zIndex,
+              });
+              const outline = new google.maps.Polyline({
+                map,
+                path,
+                strokeColor: "#ffffff",
+                strokeWeight: 9,
+                zIndex: zIndex - 1,
+              });
+              setSelected((prev) => {
+                prev.polylines.forEach((polyline) => polyline.setMap(null));
+                return { polylines: [fill, outline], trip };
+              });
+              map.fitBounds(bounds);
+            }}
+            route={route}
+            vehicle={vehicle}
+            vehicleType={visibility.vehicleType}
+            visible={getVisibility(route_type, busRouteType)}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function Marker({
   onClick,
   route,
   vehicle,
@@ -69,11 +163,10 @@ export function Point({
 
     if (newPosition.lat === 0 && newPosition.lng === 0) return; // null island
 
-    if (!markerRef.current) {
-      const markerContent = document.createElement("div");
+    let markerContent = markerRef.current?.content as HTMLDivElement | null;
+    if (!markerContent) {
+      markerContent = document.createElement("div");
       markerContent.className = styles["point-marker"];
-      markerContent.style.visibility = visible ? "visible" : "hidden";
-      markerContent.style.opacity = stale ? "0.5" : "1";
 
       const icon = document.createElement("div");
       icon.className = styles["point-marker-icon"];
@@ -86,7 +179,64 @@ export function Point({
       label.innerText = route_short_name ?? ""; // TODO: render placeholder
       label.style.color = textColor;
       markerContent.appendChild(label);
+    }
 
+    markerContent.style.visibility = visible ? "visible" : "hidden";
+    markerContent.style.opacity = stale ? "0.5" : "1";
+
+    if (bearing !== undefined) {
+      let bearingElement = markerContent.querySelector(
+        `.${styles["point-bearing"]}`
+      ) as HTMLDivElement | null;
+      let bearingSvgElement = bearingElement?.querySelector("svg");
+      if (!bearingElement) {
+        bearingElement = document.createElement("div");
+        bearingElement.className = styles["point-bearing"];
+        bearingElement.style.zIndex = `${zIndex + 2}`;
+
+        const bearingSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -9 22 15" classname="${styles["point-bearing-svg"]}">
+        <path d="M 0 -2 L 0 -2 L -7 5 L -10 2 L 0 -8 L 10 2 L 7 5 Z"  fill="${polylineColor}"/>
+      </svg>
+    `;
+        bearingElement.innerHTML = bearingSvg;
+        bearingSvgElement = bearingElement.querySelector("svg")!;
+        bearingSvgElement.classList.add(styles["point-bearing-svg"])!;
+
+        const bearingRad = (bearing * Math.PI) / 180;
+        const offsetX = 24 * Math.sin(bearingRad);
+        const offsetY = -24 * Math.cos(bearingRad);
+        bearingElement.style.transform = `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px)`;
+
+        bearingSvgElement!.style.transform = `rotate(${bearing}deg)`;
+
+        markerContent.appendChild(bearingElement);
+      }
+    }
+
+    let typeElement = markerContent.querySelector(
+      `.${styles["point-type"]}`
+    ) as HTMLDivElement | null;
+    if (!typeElement) {
+      typeElement = document.createElement("div");
+      typeElement.className = styles["point-type"];
+      typeElement.style.zIndex = `${zIndex + 1}`;
+
+      const typeIcon = document.createElement("div");
+      typeIcon.className = styles["point-type-icon"];
+      typeIcon.style.backgroundColor = typeColor;
+      typeElement.appendChild(typeIcon);
+
+      const typeIconSvg = getRouteTypeSvg(route_type);
+      typeIcon.innerHTML = typeIconSvg;
+
+      const typeIconSvgElement = typeIcon.querySelector("svg")!;
+      typeIconSvgElement.classList.add(styles["point-type-icon-svg"]);
+      markerContent.appendChild(typeElement);
+    }
+    typeElement.style.visibility =
+      visible && vehicleType ? "visible" : "hidden";
+
+    if (!markerRef.current) {
       markerRef.current = new google.maps.marker.AdvancedMarkerElement({
         content: markerContent,
         map,
@@ -95,91 +245,19 @@ export function Point({
         zIndex,
       });
       markerRef.current.addListener("gmp-click", onClick);
-    } else
-      updateMarker(map, markerRef.current, visible, stale, zIndex, newPosition);
-
-    if (bearing !== undefined)
-      if (!bearingMarkerRef.current) {
-        const bearingContent = document.createElement("div");
-        bearingContent.className = styles["point-bearing"];
-        bearingContent.style.visibility = visible ? "visible" : "hidden";
-        bearingContent.style.opacity = stale ? "0.5" : "1";
-
-        const bearingRad = (bearing * Math.PI) / 180;
-        const offsetX = 24 * Math.sin(bearingRad);
-        const offsetY = -24 * Math.cos(bearingRad);
-        bearingContent.style.transform = `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px)`;
-
-        const bearingSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-11 -9 22 15" classname="${styles["point-bearing-svg"]}">
-      <path d="M 0 -2 L 0 -2 L -7 5 L -10 2 L 0 -8 L 10 2 L 7 5 Z"  fill="${polylineColor}"/>
-    </svg>
-  `;
-        bearingContent.innerHTML = bearingSvg;
-
-        const bearingSvgElement = bearingContent.querySelector("svg")!;
-        bearingSvgElement.classList.add(styles["point-bearing-svg"]);
-        bearingSvgElement.style.transform = `rotate(${bearing}deg)`;
-
-        bearingMarkerRef.current = new google.maps.marker.AdvancedMarkerElement(
-          {
-            content: bearingContent,
-            map,
-            position: { lat: latitude, lng: longitude },
-            title: route_long_name,
-            zIndex: zIndex + 2,
-          }
-        );
-        bearingMarkerRef.current.addListener("gmp-click", onClick);
-      } else
-        updateMarker(
-          map,
-          bearingMarkerRef.current,
-          visible,
-          stale,
-          zIndex + 2,
-          newPosition,
-          bearing
-        );
-
-    if (!typeMarkerRef.current) {
-      const typeContent = document.createElement("div");
-      typeContent.className = styles["point-type"];
-      typeContent.style.visibility =
-        visible && vehicleType ? "visible" : "hidden";
-      typeContent.style.opacity = stale ? "0.5" : "1";
-
-      const typeIcon = document.createElement("div");
-      typeIcon.className = styles["point-type-icon"];
-      typeIcon.style.backgroundColor = typeColor!;
-
-      typeContent.appendChild(typeIcon);
-
-      const typeIconSvg = getRouteTypeSvg(route_type)!;
-      typeIcon.innerHTML = typeIconSvg;
-
-      const typeIconSvgElement = typeIcon.querySelector("svg")!;
-      typeIconSvgElement.classList.add(styles["point-type-icon-svg"]);
-
-      typeMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
-        content: typeContent,
-        map,
-        position: { lat: latitude, lng: longitude },
-        title: route_long_name,
-        zIndex: zIndex + 1,
-      });
-      typeMarkerRef.current.addListener("gmp-click", onClick);
-    } else
+    } else {
       updateMarker(
         map,
-        typeMarkerRef.current,
-        visible && vehicleType,
+        markerRef.current,
+        visible,
         stale,
-        zIndex + 1,
-        newPosition
+        zIndex,
+        newPosition,
+        bearing
       );
+    }
 
-    const markers = [markerRef.current, typeMarkerRef.current];
-    if (bearingMarkerRef.current) markers.push(bearingMarkerRef.current);
+    const markers = [markerRef.current];
     markersMap.current.set(vehicle_id, markers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -262,22 +340,16 @@ const updateMarker = (
     marker.position = endPosition;
     return;
   }
-  const deltaX = Math.abs(endPoint.x - startPoint.x) * Math.pow(2, zoom);
-  const deltaY = Math.abs(endPoint.y - startPoint.y) * Math.pow(2, zoom);
-  const movementDistance = Math.sqrt(deltaX ** 2 + deltaY ** 2);
-  if (movementDistance < MIN_PIXEL_MOVEMENT) {
-    marker.position = endPosition;
-    return;
-  }
 
   let startBearing: number | undefined;
   if (endBearing !== undefined) {
-    const svgElement = marker.querySelector("svg");
-    if (!svgElement) {
+    const bearingElement = marker.querySelector(`.${styles["point-bearing"]}`)!;
+    const bearingSvgElement = bearingElement.querySelector("svg");
+    if (!bearingSvgElement) {
       marker.position = endPosition;
       return;
     }
-    const transformValue = svgElement.style.transform;
+    const transformValue = bearingSvgElement.style.transform;
     const match = transformValue.match(/rotate\((-?\d+\.?\d*)deg\)/);
     startBearing = match ? parseFloat(match[1]) : undefined;
   }
@@ -318,13 +390,15 @@ function stepAnimationPosition(
     const delta = ((endBearing - startBearing + 540) % 360) - 180;
     const newBearing = startBearing + delta * easedProgress;
 
-    const bearingSvgElement = marker.querySelector("svg");
+    const bearingElement = marker.querySelector(
+      `.${styles["point-bearing"]}`
+    )! as HTMLDivElement;
+    const bearingSvgElement = bearingElement.querySelector("svg");
     if (bearingSvgElement) {
       const bearingRad = (newBearing * Math.PI) / 180;
       const offsetX = 24 * Math.sin(bearingRad);
       const offsetY = -24 * Math.cos(bearingRad);
-      const markerContent = marker.content as HTMLElement;
-      markerContent.style.transform = `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px)`;
+      bearingElement.style.transform = `translate(-50%, -50%) translate(${offsetX}px, ${offsetY}px)`;
       bearingSvgElement.style.transform = `rotate(${newBearing}deg)`;
     }
   }

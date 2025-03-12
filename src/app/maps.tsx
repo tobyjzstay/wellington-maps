@@ -14,7 +14,7 @@ import {
 import { Filters, Visibility } from "./filters";
 import { Information } from "./information";
 import styles from "./maps.module.css";
-import { Point } from "./point";
+import { Markers } from "./markers";
 import {
   BusRouteType,
   getBusRouteType,
@@ -33,7 +33,7 @@ const UPDATE_INTERVAL = 5000;
 const ZOOM = 12;
 const ZOOM_DEBOUNCE = 1000;
 
-type Selected = {
+export type Selected = {
   polylines: google.maps.Polyline[];
   trip: Trip | null;
 };
@@ -307,7 +307,6 @@ function Maps() {
           map,
           path: simplifiedPath,
           strokeColor: polylineColor,
-          strokeOpacity: 0.5,
           strokeWeight,
           visible,
           zIndex,
@@ -316,7 +315,6 @@ function Maps() {
           map,
           path: simplifiedPath,
           strokeColor,
-          strokeOpacity: 0.5,
           strokeWeight: strokeWeight * 1.5,
           visible,
           zIndex: zIndex - 1,
@@ -384,7 +382,7 @@ function Maps() {
         });
       } catch (error) {}
     }
-  }, [routeMap, shapesMap, tripMap, getVisibility]);
+  }, [routeMap, shapesMap, tripMap]);
 
   return (
     <div className={styles["maps-container"]}>
@@ -406,72 +404,16 @@ function Maps() {
         <MarkersMapContext.Provider value={markersMapRef}>
           <div className={styles["maps-map"]}>
             <GoogleMap onLoad={onMapLoad}>
-              {Array.from(vehicleMap).map(([vehicleId, vehicle]) => {
-                if (!map || !routeMap || !shapesMap || !tripMap) return;
-                const routeId = vehicle.trip?.route_id;
-                if (!routeId) return null;
-                const route = routeMap.get(routeId);
-                if (!route) return null;
-                const { polylineColor } = getRouteColors(route);
-                const { route_id, route_type } = route;
-                const busRouteType = getBusRouteType(route_id)!;
-                return (
-                  <Point
-                    key={vehicleId}
-                    onClick={() => {
-                      if (!map || !tripMap || !shapesMap || !routeMap) return;
-                      const trip_id = vehicle.trip?.trip_id;
-                      if (!trip_id) return;
-                      const trip = tripMap.get(trip_id);
-                      if (!trip) return;
-
-                      const { shape_id } = trip;
-                      if (!shape_id) return;
-                      let shapes = shapesMap.get(shape_id);
-                      if (!shapes) return;
-
-                      const path = shapes.map((shape) => ({
-                        lat: shape.shape_pt_lat,
-                        lng: shape.shape_pt_lon,
-                      }));
-
-                      const bounds = new google.maps.LatLngBounds();
-                      path.forEach((point) => bounds.extend(point));
-
-                      const zIndex = getZIndex(
-                        parseInt(vehicleId) || parseInt(routeId),
-                        ZIndexLayer.POLYLINE_SELECTED
-                      );
-
-                      const fill = new google.maps.Polyline({
-                        map,
-                        path,
-                        strokeColor: polylineColor,
-                        strokeWeight: 6,
-                        zIndex: zIndex,
-                      });
-                      const outline = new google.maps.Polyline({
-                        map,
-                        path,
-                        strokeColor: "#ffffff",
-                        strokeWeight: 9,
-                        zIndex: zIndex - 1,
-                      });
-                      setSelected((prev) => {
-                        prev.polylines.forEach((polyline) =>
-                          polyline.setMap(null)
-                        );
-                        return { polylines: [fill, outline], trip };
-                      });
-                      map.fitBounds(bounds);
-                    }}
-                    route={route}
-                    vehicle={vehicle}
-                    vehicleType={visibility.vehicleType}
-                    visible={getVisibility(route_type, busRouteType)}
-                  />
-                );
-              })}
+              <Markers
+                map={map}
+                routeMap={routeMap}
+                shapesMap={shapesMap}
+                tripMap={tripMap}
+                vehicleMap={vehicleMap}
+                getVisibility={getVisibility}
+                setSelected={setSelected}
+                visibility={visibility}
+              />
             </GoogleMap>
           </div>
         </MarkersMapContext.Provider>
